@@ -79,6 +79,7 @@
   <div class="row" style="margin-top:8px"><span>Luz</span><b id="lightlbl">100%</b></div>
   <input id="light" type="range" min="0" max="200" step="5" value="100" aria-label="Luz">
   <label class="row" style="margin-top:8px;cursor:pointer"><span>Estela en espiral</span><input type="checkbox" id="trailchk" checked></label>
+  <label class="row" style="margin-top:8px;cursor:pointer"><span>Órbitas</span><input type="checkbox" id="orbitchk" checked></label>
 </div>
 <aside id="fleet">
   <button id="fleetToggle" class="pbtn" aria-expanded="false">🛸 Naves</button>
@@ -364,11 +365,12 @@ root.add(glow);
 
 /* ---- Planetas y lunas ---- */
 const planets = []; // estado dinámico
+const orbitLines = [];   // líneas de órbita de planetas y lunas (casilla «Órbitas»)
 function orbitLine(radius, color, opacity, parent) {
   const pts = [];
   for (let i = 0; i <= 256; i++) { const a = i / 256 * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, -Math.sin(a) * radius)); }
   const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
-  parent.add(line);
+  parent.add(line); orbitLines.push(line);
   return line;
 }
 
@@ -1180,6 +1182,7 @@ lightEl.addEventListener('input', () => {
   $('lightlbl').textContent = Math.round(p * 100) + '%';
 });
 trailChk.addEventListener('change', () => { for (const t of trails) t.line.visible = trailChk.checked; });
+$('orbitchk').addEventListener('change', e => { for (const l of orbitLines) l.visible = e.target.checked; });
 
 /* =====================================================================
    NAVES — 4. MENÚ DE LOCALIZACIÓN (panel plegable, sin recrear el DOM en cada frame)
