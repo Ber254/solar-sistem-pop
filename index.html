@@ -184,7 +184,7 @@ const STR = {
     contact_btn: 'Contacta al equipo creador', contact_title: 'Contacta al equipo creador', contact_note: 'Todos los campos son obligatorios (*).',
     f_name: 'Nombre', f_mail: 'Mail', f_msg: 'Mensaje', send: 'Enviar', sending: 'Enviando…', cancel: 'Cancelar', close: 'Cerrar',
     err_name: 'Escribe tu nombre.', err_mail: 'Escribe un mail válido.', err_msg: 'El mensaje debe tener al menos 10 caracteres.',
-    ok: 'Mensaje enviado. ¡Gracias, te responderemos pronto!', fail: 'No se pudo enviar. Inténtalo de nuevo o escribe a', contact_priv: 'Usaremos tus datos solo para responderte.' },
+    ok: 'Mensaje enviado. ¡Gracias, te responderemos pronto!', activate: 'El formulario aún no está activado: abre el mail de confirmación de FormSubmit (mira también spam y promociones), pulsa el enlace de activación y vuelve a enviar.', fail: 'No se pudo enviar. Inténtalo de nuevo o escribe a', contact_priv: 'Usaremos tus datos solo para responderte.' },
   en: { year: 'Earth year:', lap: 'Current lap:', lap_n: 'lap', speed: 'Speed', light: 'Light', trails: 'Spiral trail', orbits: 'Orbits', language: 'Language',
     pause: '⏸ Pause', resume: '▶ Resume', pause_title: 'Pause / resume (space)', ships: 'Ships', show_ships: 'Show ships', others: 'Others', search_ph: 'Search ship…',
     locate: 'Locate', see: 'Show', orbiting: 'Orbiting', traveling: 'Traveling from', to: 'to', parked: 'Parked (slow orbit) near', au_sun: 'AU from the Sun',
@@ -192,7 +192,7 @@ const STR = {
     contact_btn: 'Contact the creator team', contact_title: 'Contact the creator team', contact_note: 'All fields are required (*).',
     f_name: 'Name', f_mail: 'Email', f_msg: 'Message', send: 'Send', sending: 'Sending…', cancel: 'Cancel', close: 'Close',
     err_name: 'Please enter your name.', err_mail: 'Please enter a valid email.', err_msg: 'The message must be at least 10 characters long.',
-    ok: 'Message sent. Thank you, we will get back to you soon!', fail: 'Could not send. Please try again or write to', contact_priv: 'We will only use your data to reply to you.' },
+    ok: 'Message sent. Thank you, we will get back to you soon!', activate: 'The form is not activated yet: open the FormSubmit confirmation email (check spam and promotions too), click the activation link and send again.', fail: 'Could not send. Please try again or write to', contact_priv: 'We will only use your data to reply to you.' },
 };
 const NAME_EN = { Sol: 'Sun', Mercurio: 'Mercury', Tierra: 'Earth', Luna: 'Moon', Marte: 'Mars', Fobos: 'Phobos', 'Júpiter': 'Jupiter', 'Ío': 'Io', Ganímedes: 'Ganymede', Calisto: 'Callisto',
   Saturno: 'Saturn', Rea: 'Rhea', 'Titán': 'Titan', 'Jápeto': 'Iapetus', Urano: 'Uranus', 'Oberón': 'Oberon', Neptuno: 'Neptune', 'Tritón': 'Triton', 'Plutón': 'Pluto', Caronte: 'Charon' };
@@ -1427,9 +1427,10 @@ cForm.addEventListener('submit', async ev => {
     const r = await fetch(CONTACT_ENDPOINT, { method: 'POST', headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
       body: JSON.stringify({ name: v.name, email: v.email, message: v.message, _subject: 'Sistema Solar Pop — contacto / contact', _template: 'table', _captcha: 'false' }) });
     const d = await r.json().catch(() => ({}));
-    if (!(r.ok && (d.success === true || d.success === 'true'))) throw new Error(d.message || ('HTTP ' + r.status));
+    if (!(r.ok && (d.success === true || d.success === 'true'))) { const er = new Error(d.message || ('HTTP ' + r.status)); er.activation = /activat/i.test(d.message || ''); throw er; }
     cStatus.textContent = t('ok'); cForm.reset();
   } catch (err) {                                   // fallo de red o del servicio: se ofrece el correo directo
+    if (err.activation) { cStatus.textContent = t('activate'); return; }   // primer envío: FormSubmit pide activar el destinatario
     cStatus.textContent = t('fail') + ' ';
     const a = document.createElement('a'); a.href = `mailto:${CONTACT_EMAIL}?subject=${encodeURIComponent('Sistema Solar Pop')}&body=${encodeURIComponent(v.message)}`; a.textContent = CONTACT_EMAIL; cStatus.appendChild(a);
   } finally { sendingNow = false; cSend.disabled = false; cSend.textContent = t('send'); }
