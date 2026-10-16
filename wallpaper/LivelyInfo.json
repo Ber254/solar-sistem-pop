@@ -1,0 +1,13 @@
+{
+  "AppVersion": "1.0.0.0",
+  "Title": "Sistema Solar Pop",
+  "Thumbnail": "thumbnail.jpg",
+  "Preview": "preview.gif",
+  "Desc": "Sistema solar animado (1 año terrestre = 60 s) con naves de la cultura pop de los 80 y 90 viajando de planeta en planeta. Cámara automática, FPS limitables y sin conexión a internet.",
+  "Author": "ber254",
+  "License": "",
+  "Contact": "",
+  "Type": 1,
+  "FileName": "index.html",
+  "Arguments": ""
+}

@@ -1,0 +1,12 @@
+{
+  "name": "sistema-solar-tools",
+  "private": true,
+  "type": "module",
+  "description": "Empaquetado para Lively Wallpaper y exportador a vídeo del Sistema Solar Pop (no modifica el HTML original).",
+  "scripts": {
+    "build": "node build-wallpaper.mjs",
+    "video": "node render-video.mjs",
+    "verify": "node verify.mjs"
+  },
+  "devDependencies": { "playwright": "^1.56.0" }
+}

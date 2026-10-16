@@ -1,0 +1,1350 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Sistema Solar</title>
+<style>
+  html, body { margin: 0; height: 100%; background: #000; overflow: hidden; }
+  body { font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif; color: #cfd6e4; }
+  canvas#scene { position: fixed; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
+  #hud {
+    position: fixed; top: 12px; left: 12px; padding: 10px 12px; min-width: 190px;
+    background: rgba(10, 14, 24, .62); border: 1px solid rgba(160, 180, 220, .18);
+    border-radius: 8px; font-size: 12px; line-height: 1.4; backdrop-filter: blur(4px);
+    user-select: none;
+  }
+  #hud .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+  #hud b { font-weight: 600; color: #e8edf8; }
+  .bar { height: 3px; margin: 6px 0 8px; background: rgba(160, 180, 220, .2); border-radius: 2px; overflow: hidden; }
+  .bar > i { display: block; height: 100%; width: 0; background: #7fa6e6; }
+  #hud button {
+    background: rgba(120, 150, 210, .18); color: #dbe4f6; border: 1px solid rgba(160, 180, 220, .3);
+    border-radius: 5px; padding: 3px 10px; font: inherit; cursor: pointer;
+  }
+  #hud button:hover { background: rgba(120, 150, 210, .32); }
+  #sel { display: none; margin: 0 0 8px; }
+  #sel .row b:last-child { color: #f0c37a; }
+  #hud input[type=range] { width: 100%; margin: 6px 0 0; accent-color: #7fa6e6; }
+  .pbtn {
+    background: rgba(120, 150, 210, .18); color: #dbe4f6; border: 1px solid rgba(160, 180, 220, .3);
+    border-radius: 5px; padding: 3px 10px; font: inherit; cursor: pointer;
+  }
+  .pbtn:hover { background: rgba(120, 150, 210, .32); }
+  #fleet {
+    position: fixed; top: 12px; right: 12px; width: 290px; max-width: calc(100vw - 24px); max-height: calc(100% - 24px);
+    display: flex; flex-direction: column; z-index: 4; font-size: 12px; line-height: 1.4;
+    background: rgba(10, 14, 24, .72); border: 1px solid rgba(160, 180, 220, .18); border-radius: 8px; backdrop-filter: blur(4px);
+  }
+  #fleetToggle { margin: 8px; text-align: left; }
+  #fleetBody { display: none; padding: 0 10px 10px; overflow-y: auto; }
+  #fleet.open #fleetBody { display: block; }
+  #fleet .row { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 6px; cursor: pointer; }
+  #sagaChecks { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-bottom: 8px; }
+  #sagaChecks label { cursor: pointer; }
+  #shipSearch {
+    width: 100%; box-sizing: border-box; padding: 5px 8px; font: inherit; color: #e8edf8; background: rgba(0, 0, 0, .35);
+    border: 1px solid rgba(160, 180, 220, .25); border-radius: 5px; outline: none;
+  }
+  #shipSearch:focus { border-color: #7fa6e6; }
+  .saga h4 { margin: 12px 0 2px; font-size: 11px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: #8fa1c4; }
+  .srow { padding: 6px 0; border-top: 1px solid rgba(160, 180, 220, .1); }
+  .srow .sname { display: flex; align-items: center; gap: 6px; color: #e8edf8; }
+  .srow .dot { width: 8px; height: 8px; border-radius: 50%; flex: none; }
+  .srow .smeta { margin-left: 14px; color: #7f8db0; font-size: 11px; }
+  .srow .sstat { margin: 2px 0 4px 14px; color: #a9b6d2; font-size: 11px; min-height: 15px; }
+  .srow .sbtns { margin-left: 14px; display: flex; gap: 6px; }
+  .srow .sbtns .pbtn { padding: 2px 8px; font-size: 11px; }
+  [hidden] { display: none !important; }
+  #hint { position: fixed; bottom: 10px; left: 12px; font-size: 11px; color: rgba(190, 200, 225, .45); pointer-events: none; }
+  #tip {
+    position: fixed; left: 0; top: 0; display: none; pointer-events: none; z-index: 5;
+    padding: 3px 8px; font-size: 12px; color: #fff; background: rgba(8, 12, 22, .85);
+    border: 1px solid rgba(160, 180, 220, .35); border-radius: 5px; white-space: nowrap;
+  }
+</style>
+</head>
+<body>
+<canvas id="scene"></canvas>
+<div id="hud">
+  <div class="row"><span>Año terrestre: <b id="year">1</b></span><button id="play" title="Pausa / reanudar (espacio)">⏸ Pausa</button></div>
+  <div style="margin-top:4px">Vuelta actual: <b id="lap">0%</b></div>
+  <div class="bar"><i id="barfill"></i></div>
+  <div id="sel">
+    <div class="row"><span id="selname">—</span><b id="sellap">0%</b></div>
+    <div class="bar" style="margin-bottom:0"><i id="selfill" style="background:#f0c37a"></i></div>
+  </div>
+  <div class="row"><span>Velocidad</span><b id="spdlbl">x1</b></div>
+  <input id="speed" type="range" min="-2" max="2" step="0.05" value="0" aria-label="Velocidad">
+  <div class="row" style="margin-top:8px"><span>Luz</span><b id="lightlbl">100%</b></div>
+  <input id="light" type="range" min="0" max="200" step="5" value="100" aria-label="Luz">
+  <label class="row" style="margin-top:8px;cursor:pointer"><span>Estela en espiral</span><input type="checkbox" id="trailchk" checked></label>
+</div>
+<aside id="fleet">
+  <button id="fleetToggle" class="pbtn" aria-expanded="false">🛸 Naves</button>
+  <div id="fleetBody">
+    <label class="row"><span>Mostrar naves</span><input type="checkbox" id="shipsMaster" checked></label>
+    <div id="sagaChecks">
+      <label><input type="checkbox" data-saga="sw" checked> Star Wars</label>
+      <label><input type="checkbox" data-saga="st" checked> Star Trek</label>
+      <label><input type="checkbox" data-saga="otras" checked> Otras</label>
+    </div>
+    <input id="shipSearch" type="search" placeholder="Buscar nave…" aria-label="Buscar nave">
+    <div id="shipList"></div>
+  </div>
+</aside>
+<div id="hint">Arrastrar: rotar · Rueda: zoom · Clic en planeta: ver su vuelta · Clic en nave: seguirla (Esc: soltar)</div>
+<div id="tip"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+"use strict";
+
+/* =====================================================================
+   DATOS DE LOS CUERPOS  (todo el escenario se genera desde este array)
+   ---------------------------------------------------------------------
+   ESCALAS (unidades de escena; el Sol está en el origen):
+   - Distancia orbital:  a = 10 + 16·√(UA)   → raíz cuadrada de la distancia real
+     (más un desplazamiento para que Mercurio no quede pegado al Sol).
+     Mantiene el orden real y comprime Plutón (39,5 UA) a ~110 u.
+   - Radios: exagerados y NO proporcionales a los reales; solo se respeta
+     el orden: Júpiter > Saturno > Urano ≈ Neptuno > Tierra ≈ Venus > Marte > Mercurio.
+   - Periodos planetarios: reales, en años terrestres (1 año = 60 s de reloj).
+   - Lunas: radios orbitales y periodos (segundos reales por vuelta) COMPRIMIDOS,
+     entre ~3 y 20 s, conservando el orden relativo de cada sistema.
+     Los radios orbitales se mantienen menores que la separación al planeta vecino.
+   - rotHours: periodo de rotación REAL en horas (negativo = retrógrado). Se escala con un
+     único factor (ROT_SECONDS_PER_HOUR), así que las velocidades relativas son las reales:
+     la Tierra gira en 12 s, Júpiter en ~5 s, Venus casi no se mueve (243 días reales).
+   ===================================================================== */
+const EARTH_YEAR_SECONDS = 60;
+const TAU = Math.PI * 2;
+const ROT_SECONDS_PER_HOUR = 0.5; // 1 h real de rotación = 0,5 s de reloj (a x1)
+/* Avance del sistema: el Sol se desplaza por la galaxia y arrastra a los planetas, así que en 3D
+   cada uno traza una hélice. Velocidad muy exagerada (unidades de escena por segundo simulado);
+   con 0,2 u/s una vuelta de la Tierra avanza 12 u. Las estelas se dibujan en el espacio fijo. */
+const DRIFT = 0.2;
+const TRAIL_SECONDS = 120;   // duración de la estela (2 años terrestres)
+const TRAIL_DT = 0.25;       // un punto cada 0,25 s simulados
+const TRAIL_CAP = Math.round(TRAIL_SECONDS / TRAIL_DT);
+const orbitRadius = au => 10 + 16 * Math.sqrt(au);
+
+const BODIES = [
+  { name: 'Mercurio', radius: 0.55, au: 0.387, period: 0.241, trail: '#b8a898', rotHours: 1407.6, tilt: 0,
+    tex: { type: 'rock', base: [150, 140, 130], vary: 0.35 } },
+  { name: 'Venus', radius: 1.0, au: 0.723, period: 0.615, trail: '#e6c888', rotHours: -5832.5, tilt: 3,
+    tex: { type: 'rock', base: [222, 190, 130], vary: 0.12, freq: 3 } },
+  { name: 'Tierra', radius: 1.05, au: 1.0, period: 1.0, trail: '#6aa8ff', rotHours: 23.93, tilt: 23.4,
+    tex: { type: 'earth' },
+    moons: [
+      { name: 'Luna', radius: 0.3, orbit: 2.0, period: 5, tex: { type: 'rock', base: [175, 175, 172], vary: 0.4 } },
+    ] },
+  { name: 'Marte', radius: 0.75, au: 1.524, period: 1.881, trail: '#e8785a', rotHours: 24.62, tilt: 25,
+    tex: { type: 'mars' },
+    moons: [
+      { name: 'Fobos', radius: 0.14, orbit: 1.3, period: 3, tex: { type: 'rock', base: [130, 115, 100], vary: 0.3 } },
+      { name: 'Deimos', radius: 0.11, orbit: 1.9, period: 6, tex: { type: 'rock', base: [150, 135, 120], vary: 0.3 } },
+    ] },
+  { name: 'Júpiter', radius: 4.0, au: 5.203, period: 11.86, trail: '#e8b88a', rotHours: 9.93, tilt: 3,
+    tex: { type: 'bands', pal: ['#d8c3a5', '#b5835a', '#ecdfc8', '#a8693f', '#e4d4ba', '#c08a5a', '#efe3d0', '#9c6a45', '#d9c5a7'], turb: 1.0, spot: true },
+    moons: [
+      { name: 'Ío', radius: 0.35, orbit: 5.4, period: 3, tex: { type: 'rock', base: [225, 200, 110], vary: 0.3 } },
+      { name: 'Europa', radius: 0.32, orbit: 6.6, period: 5, tex: { type: 'rock', base: [215, 205, 190], vary: 0.15 } },
+      { name: 'Ganímedes', radius: 0.5, orbit: 8.0, period: 8.5, tex: { type: 'rock', base: [150, 135, 120], vary: 0.35 } },
+      { name: 'Calisto', radius: 0.45, orbit: 9.6, period: 14, tex: { type: 'rock', base: [95, 85, 78], vary: 0.35 } },
+    ] },
+  { name: 'Saturno', radius: 3.4, au: 9.537, period: 29.46, trail: '#ecd694', rotHours: 10.66, tilt: 26.7,
+    tex: { type: 'bands', pal: ['#e6d3a3', '#d2b97f', '#eadcb4', '#c9ad78', '#e3d1a0', '#d6bf8c'], turb: 0.5 },
+    rings: { inner: 4.4, outer: 7.8 }, eqMoons: true,
+    moons: [
+      { name: 'Rea', radius: 0.32, orbit: 9.3, period: 5, tex: { type: 'rock', base: [200, 198, 192], vary: 0.25 } },
+      { name: 'Titán', radius: 0.55, orbit: 10.9, period: 11, tex: { type: 'rock', base: [215, 160, 70], vary: 0.1, freq: 3 } },
+      { name: 'Jápeto', radius: 0.34, orbit: 12.5, period: 20, tex: { type: 'rock', base: [150, 140, 125], vary: 0.5 } },
+    ] },
+  { name: 'Urano', radius: 2.3, au: 19.19, period: 84.01, trail: '#8ae6ee', rotHours: -17.24, tilt: 82, eqMoons: true,
+    tex: { type: 'bands', pal: ['#a9e0e6', '#9ad6df', '#b3e5ea', '#95d0da'], turb: 0.3 },
+    moons: [
+      { name: 'Titania', radius: 0.4, orbit: 4.8, period: 6, tex: { type: 'rock', base: [165, 160, 155], vary: 0.3 } },
+      { name: 'Oberón', radius: 0.38, orbit: 6.2, period: 9, tex: { type: 'rock', base: [140, 130, 125], vary: 0.3 } },
+    ] },
+  { name: 'Neptuno', radius: 2.2, au: 30.07, period: 164.8, trail: '#5a82ff', rotHours: 16.11, tilt: 28,
+    tex: { type: 'bands', pal: ['#3d63d6', '#3558c4', '#4a73e0', '#2f4fb8', '#4468d6'], turb: 0.6, spot: 'dark' },
+    moons: [
+      { name: 'Tritón', radius: 0.4, orbit: 4.8, period: -7, tex: { type: 'rock', base: [225, 205, 205], vary: 0.2 } },
+    ] },
+  { name: 'Plutón', radius: 0.55, au: 39.48, period: 248, trail: '#d8b898', rotHours: -153.3, tilt: 0, dwarf: true,
+    tex: { type: 'rock', base: [200, 170, 140], vary: 0.4 },
+    moons: [
+      { name: 'Caronte', radius: 0.27, orbit: 1.5, period: 5, tex: { type: 'rock', base: [150, 148, 150], vary: 0.3 } },
+    ] },
+];
+const SUN = { name: 'Sol', radius: 6.5, trail: '#ffb347', rotHours: 609 }; // ~25,4 días en el ecuador
+
+/* =====================================================================
+   TEXTURAS PROCEDURALES (canvas, sin imágenes externas)
+   ===================================================================== */
+function hash(x, y, s) {
+  let h = Math.imul(x, 374761393) ^ Math.imul(y, 668265263) ^ Math.imul(s + 1, 2147483629);
+  h = Math.imul(h ^ (h >>> 13), 1274126177); h ^= h >>> 16;
+  return (h >>> 0) / 4294967296;
+}
+// Ruido de valor periódico en X (px = periodo entero) → textura sin costura.
+function vnoise(x, y, px, s) {
+  const xi = Math.floor(x), yi = Math.floor(y), fx = x - xi, fy = y - yi;
+  const sx = fx * fx * (3 - 2 * fx), sy = fy * fy * (3 - 2 * fy);
+  const x0 = ((xi % px) + px) % px, x1 = (x0 + 1) % px;
+  const a = hash(x0, yi, s), b = hash(x1, yi, s), c = hash(x0, yi + 1, s), d = hash(x1, yi + 1, s);
+  return a + (b - a) * sx + (c - a) * sy + (a - b - c + d) * sx * sy;
+}
+function fbm(x, y, px, s, oct) {
+  let sum = 0, amp = 0.5, tot = 0, f = 1;
+  for (let o = 0; o < oct; o++) { sum += amp * vnoise(x * f, y * f, px * f, s + o); tot += amp; amp *= 0.5; f *= 2; }
+  return sum / tot;
+}
+function hex(c) { return [parseInt(c.slice(1, 3), 16), parseInt(c.slice(3, 5), 16), parseInt(c.slice(5, 7), 16)]; }
+const mix = (a, b, t) => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const clamp01 = v => Math.max(0, Math.min(1, v));
+
+function paint(w, h, fn) {
+  const cv = document.createElement('canvas'); cv.width = w; cv.height = h;
+  const ctx = cv.getContext('2d'), img = ctx.createImageData(w, h), d = img.data;
+  for (let j = 0; j < h; j++) for (let i = 0; i < w; i++) {
+    const c = fn(i / w, j / h), k = (j * w + i) * 4;
+    d[k] = c[0]; d[k + 1] = c[1]; d[k + 2] = c[2]; d[k + 3] = c.length > 3 ? c[3] : 255;
+  }
+  ctx.putImageData(img, 0, 0);
+  const t = new THREE.CanvasTexture(cv);
+  t.anisotropy = 4;
+  return t;
+}
+
+let seedCounter = 1;
+function makeTexture(spec) {
+  const seed = seedCounter++ * 17;
+  switch (spec.type) {
+    case 'rock': {
+      const base = spec.base, vr = spec.vary, f = spec.freq || 4;
+      return paint(256, 128, (u, v) => {
+        const n = fbm(u * f, v * f / 2, f, seed, 5), m = fbm(u * f * 3, v * f * 1.5, f * 3, seed + 9, 3);
+        const k = 1 + (n - 0.5) * 2 * vr + (m - 0.5) * vr * 0.8;
+        return [base[0] * k, base[1] * k, base[2] * k];
+      });
+    }
+    case 'earth':
+      return paint(512, 256, (u, v) => {
+        const h = fbm(u * 5, v * 2.5, 5, seed, 6), pole = Math.abs(v - 0.5) * 2;
+        if (pole > 0.86 + (fbm(u * 8, 0, 8, seed + 3, 3) - 0.5) * 0.1) return [236, 242, 248];
+        if (h > 0.52) {
+          const dry = fbm(u * 6, v * 3, 6, seed + 5, 4);
+          return mix([62, 130, 66], [168, 146, 92], clamp01((dry - 0.4) * 3 + pole * 0.4));
+        }
+        return mix([18, 56, 130], [34, 96, 172], clamp01((h - 0.2) * 3));
+      });
+    case 'mars':
+      return paint(256, 128, (u, v) => {
+        const n = fbm(u * 5, v * 2.5, 5, seed, 5), pole = Math.abs(v - 0.5) * 2;
+        if (pole > 0.92) return [240, 236, 232];
+        return mix([185, 92, 52], [118, 58, 40], clamp01((n - 0.35) * 2.2));
+      });
+    case 'bands': {
+      const pal = spec.pal.map(hex), n = pal.length, turb = spec.turb;
+      return paint(512, 256, (u, v) => {
+        const t = fbm(u * 6, v * 3, 6, seed, 5);
+        let s = v * n + (t - 0.5) * turb * 3.2;
+        s = Math.max(0, Math.min(n - 0.001, s));
+        const i = Math.floor(s), f = s - i, col = mix(pal[i], pal[Math.min(n - 1, i + 1)], clamp01((f - 0.3) * 1.6));
+        let c = col;
+        if (spec.spot) { // gran mancha (Júpiter: rojiza; Neptuno: oscura)
+          const dx = (u - 0.3) / 0.07, dy = (v - 0.62) / 0.045, q = dx * dx + dy * dy;
+          if (q < 1) c = mix(c, spec.spot === 'dark' ? [20, 35, 110] : [190, 95, 60], (1 - q) * 0.85);
+        }
+        return c;
+      });
+    }
+    case 'sun': // fotosfera: naranja con granulado suave, nunca blanco
+      return paint(512, 256, (u, v) => {
+        const n = fbm(u * 6, v * 3, 6, seed, 6), g = fbm(u * 24, v * 12, 24, seed + 4, 3);
+        const k = clamp01((n - 0.3) * 1.6 + (g - 0.5) * 0.35);
+        return mix([214, 104, 26], [244, 170, 56], k);
+      });
+  }
+}
+
+function makeGlowTexture() {
+  const s = 256, cv = document.createElement('canvas'); cv.width = cv.height = s;
+  const ctx = cv.getContext('2d'), g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0.00, 'rgba(255,160,60,0.55)');
+  g.addColorStop(0.45, 'rgba(255,140,40,0.30)');
+  g.addColorStop(0.70, 'rgba(255,110,30,0.10)');
+  g.addColorStop(1.00, 'rgba(255,100,20,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s);
+  return new THREE.CanvasTexture(cv);
+}
+
+function makeRingTexture() {
+  return paint(512, 4, (u) => {
+    // bandas de densidad con una división tipo Cassini hacia el 62 %
+    let a = 0.5 + 0.35 * fbm(u * 40, 0.5, 40, 77, 4) + 0.15 * Math.sin(u * 60);
+    if (u > 0.60 && u < 0.66) a *= 0.12;
+    if (u < 0.08) a *= u / 0.08;           // borde interior difuso
+    if (u > 0.95) a *= (1 - u) / 0.05;     // borde exterior difuso
+    return [218, 200, 165, clamp01(a) * 255 * 0.8];
+  });
+}
+
+/* =====================================================================
+   ESCENA
+   ===================================================================== */
+const canvas = document.getElementById('scene');
+const renderer = new THREE.WebGLRenderer({ canvas, antialias: true });
+renderer.setClearColor(0x000000, 1);
+const scene = new THREE.Scene();
+const camera = new THREE.PerspectiveCamera(45, 1, 0.5, 4000);
+
+// Luz del Sol (puntual, sin atenuación) + ambiental mínima para el lado nocturno
+const root = new THREE.Group();            // todo lo que viaja con el Sol (se desplaza por Y)
+scene.add(root);
+const SUN_LIGHT = 1.9, AMBIENT_LIGHT = 0.35;
+const sunLight = new THREE.PointLight(0xfff1dc, SUN_LIGHT, 0, 0);
+const ambient = new THREE.AmbientLight(0x6a7590, AMBIENT_LIGHT);
+root.add(sunLight); root.add(ambient);
+
+/* ---- Estrellas: puntos pequeños, parte con parpadeo suave ---- */
+const starUniforms = { uTime: { value: 0 }, uPx: { value: 1 } };
+let starsObj;
+(function makeStars() {
+  const N = 2600, pos = new Float32Array(N * 3), size = new Float32Array(N), phase = new Float32Array(N), tw = new Float32Array(N);
+  for (let i = 0; i < N; i++) {
+    const u = Math.random() * 2 - 1, a = Math.random() * Math.PI * 2, r = Math.sqrt(1 - u * u), R = 1500 + Math.random() * 300;
+    pos.set([r * Math.cos(a) * R, u * R, r * Math.sin(a) * R], i * 3);
+    size[i] = 0.8 + Math.random() * Math.random() * 1.8;
+    phase[i] = Math.random() * 6.283;
+    tw[i] = Math.random() < 0.3 ? 0.25 + Math.random() * 0.4 : 0; // 30 % parpadean
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3));
+  g.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+  g.setAttribute('aPhase', new THREE.BufferAttribute(phase, 1));
+  g.setAttribute('aTw', new THREE.BufferAttribute(tw, 1));
+  const m = new THREE.ShaderMaterial({
+    uniforms: starUniforms, transparent: true, depthWrite: false,
+    vertexShader: `
+      attribute float aSize, aPhase, aTw; uniform float uTime, uPx; varying float vA;
+      void main() {
+        vA = 0.55 + 0.25 * aSize - aTw * (0.5 + 0.5 * sin(uTime * 1.7 + aPhase));
+        gl_PointSize = aSize * uPx;
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }`,
+    fragmentShader: `
+      varying float vA;
+      void main() {
+        float d = length(gl_PointCoord - 0.5);
+        gl_FragColor = vec4(0.85, 0.9, 1.0, clamp(vA, 0.1, 0.9) * smoothstep(0.5, 0.15, d));
+      }`,
+  });
+  const stars = new THREE.Points(g, m);
+  stars.frustumCulled = false;
+  starsObj = stars;
+  scene.add(stars);
+})();
+
+/* ---- Sol ---- */
+const hitTargets = []; // { name, obj, radius } para tooltip
+const sunMesh = new THREE.Mesh(
+  new THREE.SphereGeometry(SUN.radius, 64, 32),
+  new THREE.MeshBasicMaterial({ map: makeTexture({ type: 'sun' }) })
+);
+root.add(sunMesh);
+hitTargets.push({ name: SUN.name, obj: sunMesh, radius: SUN.radius });
+const glow = new THREE.Sprite(new THREE.SpriteMaterial({
+  map: makeGlowTexture(), blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.55,
+}));
+glow.scale.setScalar(SUN.radius * 4.2); // el disco del Sol (depthTest) tapa la parte central
+root.add(glow);
+
+/* ---- Planetas y lunas ---- */
+const planets = []; // estado dinámico
+function orbitLine(radius, color, opacity, parent) {
+  const pts = [];
+  for (let i = 0; i <= 256; i++) { const a = i / 256 * Math.PI * 2; pts.push(new THREE.Vector3(Math.cos(a) * radius, 0, -Math.sin(a) * radius)); }
+  const line = new THREE.Line(new THREE.BufferGeometry().setFromPoints(pts), new THREE.LineBasicMaterial({ color, transparent: true, opacity, depthWrite: false }));
+  parent.add(line);
+  return line;
+}
+
+BODIES.forEach((b, idx) => {
+  b.rot = b.rotHours * ROT_SECONDS_PER_HOUR;
+  const a = orbitRadius(b.au);
+  b.orbitR = a;
+  orbitLine(a, 0x8fa4c8, 0.22, root);
+
+  const pivot = new THREE.Group();                 // se mueve sobre la órbita
+  root.add(pivot);
+  const tiltG = new THREE.Group();                 // inclina el eje de giro
+  tiltG.rotation.z = THREE.MathUtils.degToRad(b.tilt);
+  pivot.add(tiltG);
+  const mesh = new THREE.Mesh(new THREE.SphereGeometry(b.radius, 48, 32), new THREE.MeshLambertMaterial({ map: makeTexture(b.tex) }));
+  tiltG.add(mesh);                                  // el mesh es el que gira
+  hitTargets.push({ name: b.name, obj: mesh, radius: b.radius, planet: b });
+
+  if (b.rings) {
+    const rg = new THREE.RingGeometry(b.rings.inner, b.rings.outer, 128, 1);
+    const p = rg.attributes.position, uv = rg.attributes.uv;
+    for (let i = 0; i < p.count; i++) uv.setXY(i, (Math.hypot(p.getX(i), p.getY(i)) - b.rings.inner) / (b.rings.outer - b.rings.inner), 0.5);
+    const rings = new THREE.Mesh(rg, new THREE.MeshLambertMaterial({ map: makeRingTexture(), side: THREE.DoubleSide, transparent: true, depthWrite: false }));
+    rings.rotation.x = -Math.PI / 2;
+    tiltG.add(rings);
+  }
+
+  const moonParent = b.eqMoons ? tiltG : pivot;     // Saturno/Urano: lunas en el plano ecuatorial
+  const moons = (b.moons || []).map((m, mi) => {
+    const mp = new THREE.Group(); moonParent.add(mp);
+    orbitLine(m.orbit, 0x8fa4c8, 0.1, mp);
+    const mm = new THREE.Mesh(new THREE.SphereGeometry(m.radius, 24, 16), new THREE.MeshLambertMaterial({ map: makeTexture(m.tex) }));
+    mp.add(mm);
+    hitTargets.push({ name: m.name, obj: mm, radius: m.radius });
+    return { def: m, mesh: mm, phase: (mi * 2.1 + idx * 0.7) % 6.283 };
+  });
+  planets.push({ def: b, pivot, mesh, moons, phase: (idx * 0.9 + 0.4) % 6.283 });
+});
+
+/* ---- Estelas helicoidales (espacio fijo, fuera de `root`) ---- */
+const trails = [{ def: SUN, orbitR: 0, phase: 0, period: 1 }, ...planets.map(p => ({ def: p.def, orbitR: p.def.orbitR, phase: p.phase, period: p.def.period }))].map(t => {
+  const geo = new THREE.BufferGeometry(), pos = new Float32Array((TRAIL_CAP + 1) * 3), col = new Float32Array((TRAIL_CAP + 1) * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage));
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  line.frustumCulled = false;
+  scene.add(line);
+  return { ...t, geo, pos, col, line, count: 0, tint: new THREE.Color(t.def.trail) };
+});
+let trailT = -TRAIL_SECONDS;     // se rellena el pasado al arrancar, para ver la hélice desde el principio
+function trailPoint(t, simT, out, i) {
+  const ang = t.phase + TAU * (simT / EARTH_YEAR_SECONDS) / t.period;
+  out[i] = Math.cos(ang) * t.orbitR; out[i + 1] = DRIFT * simT; out[i + 2] = -Math.sin(ang) * t.orbitR;
+}
+function updateTrails(simT) {
+  while (trailT + TRAIL_DT <= simT) {
+    trailT += TRAIL_DT;
+    for (const t of trails) {
+      if (t.count === TRAIL_CAP) { t.pos.copyWithin(0, 3, TRAIL_CAP * 3); t.count--; }
+      trailPoint(t, trailT, t.pos, t.count * 3); t.count++;
+    }
+  }
+  for (const t of trails) {
+    trailPoint(t, simT, t.pos, t.count * 3);          // último vértice = posición actual
+    const n = t.count + 1;
+    for (let i = 0; i < n; i++) { const k = Math.pow(i / (n - 1), 1.6) * 0.5; t.col[i * 3] = t.tint.r * k; t.col[i * 3 + 1] = t.tint.g * k; t.col[i * 3 + 2] = t.tint.b * k; }
+    t.geo.setDrawRange(0, n);
+    t.geo.attributes.position.needsUpdate = true; t.geo.attributes.color.needsUpdate = true;
+  }
+}
+
+/* =====================================================================
+   NAVES — 1. CATÁLOGO (array único, fácil de editar)
+   ---------------------------------------------------------------------
+   size   = longitud de la nave (diámetro en estaciones y discos) en «unidades de nave».
+            Se multiplica por SHIP_VIS, un factor de visualización común, para pasar a unidades
+            de escena. Está MUY exagerado y no respeta las proporciones reales (un X-Wing real mide
+            12 m y la Estrella de la Muerte 120 km): solo se mantiene un orden razonable entre naves.
+   kind   = 'ship' (viaja) | 'station' (no viaja: órbita lenta alrededor del Sol) | 'fleet' (flota).
+   fleet  = { formation: 'V' | 'line' | 'swarm', members: [{ model, n, size }] }.
+            Si la entrada tiene `model`, es el buque capital y los miembros lo escoltan;
+            si no, el primer miembro hace de líder y los demás siguen su formación.
+   model  = clave de MODELS (más abajo). color = color principal (marcador, estela, menú).
+   ===================================================================== */
+const SHIP_VIS = 0.5;
+const SAGAS = [
+  { key: 'sw', label: 'Star Wars' },
+  { key: 'st', label: 'Star Trek' },
+  { key: 'otras', label: 'Otras' },
+];
+const SHIPS = [
+  // ---- Star Wars ----
+  { id: 'falcon', alias: 'Millennium Falcon Han Solo Chewbacca', name: 'Halcón Milenario', saga: 'sw', work: 'Star Wars', year: '1977-83', color: '#d9d4c4', size: 1.0, model: 'falcon', kind: 'ship' },
+  { id: 'xwing', alias: 'X-Wing Red Five Luke', name: 'X-Wing «Red Five» de Luke Skywalker', saga: 'sw', work: 'Star Wars', year: '1977-83', color: '#e0584a', size: 0.7, model: 'xwing', kind: 'ship' },
+  { id: 'ywing', name: 'Ala-Y', saga: 'sw', work: 'Star Wars', year: '1977-83', color: '#d8b86a', size: 0.9, model: 'ywing', kind: 'ship' },
+  { id: 'awing', name: 'Ala-A', saga: 'sw', work: 'Star Wars', year: '1983', color: '#e8715a', size: 0.6, model: 'awing', kind: 'ship' },
+  { id: 'slave1', alias: 'Boba Fett', name: 'Slave I (Boba Fett)', saga: 'sw', work: 'Star Wars', year: '1980', color: '#8fb07a', size: 0.8, model: 'slave1', kind: 'ship' },
+  { id: 'lambda', alias: 'Lambda Shuttle', name: 'Lanzadera imperial clase Lambda', saga: 'sw', work: 'Star Wars', year: '1983', color: '#c8ccd2', size: 0.9, model: 'lambda', kind: 'ship' },
+  { id: 'deathstar', alias: 'Death Star', name: 'Estrella de la Muerte', saga: 'sw', work: 'Star Wars', year: '1977-83', color: '#9aa0a8', size: 3.2, model: 'deathstar', kind: 'station' },
+  { id: 'destroyer', alias: 'Star Destroyer TIE Fighter', name: 'Destructor Estelar imperial (con cazas TIE)', saga: 'sw', work: 'Star Wars', year: '1980', color: '#aab2bc', size: 4.5, model: 'destroyer', kind: 'fleet',
+    fleet: { formation: 'swarm', members: [{ model: 'tie', n: 8, size: 0.55 }] } },
+  { id: 'rebels', alias: 'Rebel Fleet', name: 'Flota rebelde (X-Wing y Ala-Y)', saga: 'sw', work: 'Star Wars', year: '1983', color: '#f0c070', size: 0.8, kind: 'fleet',
+    fleet: { formation: 'V', members: [{ model: 'xwing', n: 4, size: 0.7 }, { model: 'ywing', n: 3, size: 0.9 }] } },
+  // ---- Star Trek ----
+  { id: 'enterpriseD', alias: 'Picard TNG', name: 'USS Enterprise NCC-1701-D', saga: 'st', work: 'Star Trek: La nueva generación', year: '1987-94', color: '#9fc4ff', size: 2.6, model: 'enterpriseD', kind: 'ship' },
+  { id: 'enterpriseA', alias: 'Kirk', name: 'USS Enterprise NCC-1701 (refit)', saga: 'st', work: 'Star Trek (películas)', year: '1979-91', color: '#b9d2f2', size: 2.0, model: 'enterpriseRefit', kind: 'ship' },
+  { id: 'bop', alias: 'Klingon', name: 'Klingon Bird of Prey', saga: 'st', work: 'Star Trek III-VI', year: '1984-91', color: '#78b86a', size: 1.4, model: 'bop', kind: 'ship' },
+  { id: 'voyager', name: 'USS Voyager', saga: 'st', work: 'Star Trek: Voyager', year: '1995', color: '#a9b4d0', size: 1.6, model: 'voyager', kind: 'ship' },
+  // ---- Otras ----
+  { id: 'galactica', alias: 'Cylon Viper', name: 'Battlestar Galactica (con Colonial Vipers)', saga: 'otras', work: 'Battlestar Galactica', year: '1978-80', color: '#c8a060', size: 3.6, model: 'galactica', kind: 'fleet',
+    fleet: { formation: 'V', members: [{ model: 'viper', n: 6, size: 0.6 }] } },
+  { id: 'raiders', alias: 'Cylon Raider', name: 'Cylon Raiders', saga: 'otras', work: 'Battlestar Galactica', year: '1978-80', color: '#e05a4a', size: 0.6, kind: 'fleet',
+    fleet: { formation: 'swarm', members: [{ model: 'raider', n: 6, size: 0.6 }] } },
+  { id: 'nostromo', name: 'Nostromo', saga: 'otras', work: 'Alien', year: '1979', color: '#b09a78', size: 2.4, model: 'nostromo', kind: 'ship' },
+  { id: 'sulaco', name: 'Sulaco', saga: 'otras', work: 'Aliens', year: '1986', color: '#8a96a2', size: 3.0, model: 'sulaco', kind: 'ship' },
+  { id: 'et', alias: 'ET extraterrestre', name: 'Nave de E.T.', saga: 'otras', work: 'E.T., el extraterrestre', year: '1982', color: '#e0b88a', size: 1.0, model: 'et', kind: 'ship' },
+  { id: 'alf', alias: 'Melmac', name: 'Nave de Alf (Melmac)', saga: 'otras', work: 'ALF', year: '1986', color: '#8fd0e8', size: 0.9, model: 'alf', kind: 'ship' },
+  { id: 'delorean', alias: 'Back to the Future Marty', name: 'DeLorean volador', saga: 'otras', work: 'Regreso al futuro II', year: '1989', color: '#d0d4d8', size: 0.5, model: 'delorean', kind: 'ship' },
+  { id: 'eagle5', alias: 'Spaceballs', name: 'Eagle 5', saga: 'otras', work: 'Spaceballs', year: '1987', color: '#f0ede4', size: 1.6, model: 'eagle5', kind: 'ship' },
+  { id: 'spaceball1', alias: 'Spaceballs', name: 'Spaceball One', saga: 'otras', work: 'Spaceballs', year: '1987', color: '#c8c4b4', size: 4.0, model: 'spaceball', kind: 'ship' },
+  { id: 'mothership', alias: 'Independence Day Mothership', name: 'Nave nodriza (con cazas atacantes)', saga: 'otras', work: 'Independence Day', year: '1996', color: '#8a8782', size: 6.0, model: 'mothership', kind: 'fleet',
+    fleet: { formation: 'swarm', members: [{ model: 'attacker', n: 10, size: 0.6 }] } },
+  { id: 'sdf1', alias: 'Robotech', name: 'SDF-1 Macross', saga: 'otras', work: 'Macross / Robotech', year: '1982-85', color: '#8ea4ba', size: 3.2, model: 'macross', kind: 'ship' },
+  { id: 'ark', alias: 'Autobots Transformers', name: 'Arca de los Autobots', saga: 'otras', work: 'Transformers', year: '1984', color: '#d0584a', size: 2.8, model: 'ark', kind: 'ship' },
+  { id: 'heartofgold', alias: 'Hitchhiker Autoestopista', name: 'Heart of Gold', saga: 'otras', work: 'Guía del autoestopista galáctico', year: '1981', color: '#f4f4f0', size: 1.4, model: 'heartgold', kind: 'ship' },
+  { id: 'liberator', alias: 'Blakes 7', name: 'Liberator', saga: 'otras', work: "Blake's 7", year: '1978-81', color: '#a8c0e0', size: 1.2, model: 'liberator', kind: 'ship' },
+  { id: 'buck', alias: 'Buck Rogers Starfighter', name: 'Starfighter de Buck Rogers', saga: 'otras', work: 'Buck Rogers en el siglo XXV', year: '1979-81', color: '#7fb0e8', size: 0.8, model: 'buckrogers', kind: 'ship' },
+  { id: 'mondo', alias: 'Fifth Element', name: 'Nave Mondoshawan', saga: 'otras', work: 'El quinto elemento', year: '1997', color: '#d8b868', size: 2.2, model: 'mondo', kind: 'ship' },
+  { id: 'starbug', alias: 'Red Dwarf', name: 'Starbug (Red Dwarf)', saga: 'otras', work: 'Red Dwarf', year: '1988', color: '#80c070', size: 0.9, model: 'starbug', kind: 'ship' },
+  // ---- Zathura, Depredador y Prometheus (siluetas aproximadas hechas con primitivas) ----
+  { id: 'zathura', alias: 'Zathura casa house', name: 'La casa de Zathura', saga: 'otras', work: 'Zathura: una aventura espacial', year: '2005', color: '#e6c88a', size: 1.1, model: 'zathura', kind: 'ship' },
+  { id: 'zorgon', alias: 'Zathura Zorgon', name: 'Nave Zorgon', saga: 'otras', work: 'Zathura: una aventura espacial', year: '2005', color: '#d0603c', size: 1.8, model: 'zorgon', kind: 'ship' },
+  { id: 'predator', alias: 'Predator Depredador cazador', name: 'Nave del Depredador', saga: 'otras', work: 'Depredador', year: '1987-90', color: '#7dffc8', size: 2.4, model: 'predator', kind: 'ship' },
+  { id: 'prometheus', alias: 'Prometheus Prometeo Weyland Alien', name: 'Prometheus', saga: 'otras', work: 'Prometheus', year: '2012', color: '#b8c4d0', size: 2.6, model: 'prometheus', kind: 'ship' },
+];
+
+/* =====================================================================
+   NAVES — 2. CONSTRUCTORES DE MODELOS (solo primitivas y colores sólidos)
+   Cada modelo se escribe con el morro hacia +Z, se fusiona en UNA geometría con colores por
+   vértice (1 draw call por nave) y se normaliza a longitud máxima 1 y centro en el origen;
+   luego se escala con size·SHIP_VIS. Los motores («engines») son brillos aditivos.
+   ===================================================================== */
+const BLUE = '#6fb4ff', ORANGE = '#ff9d4d', REDG = '#ff5a4a', GREENG = '#7dff9a', CYAN = '#8fe8ff', PINK = '#ff8fd0';
+
+function wedgeGeo(w, h, l) { // cuña plana: morro en +Z, cresta trasera elevada
+  const N = [0, 0, l / 2], RL = [-w / 2, 0, -l / 2], RR = [w / 2, 0, -l / 2], Tp = [0, h, -l * 0.3];
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute([N, RR, RL, N, RL, Tp, N, Tp, RR, RL, RR, Tp].flat(), 3));
+  g.computeVertexNormals();
+  return g;
+}
+
+const MODELS = (() => {
+  const part = (geo, color, p = [0, 0, 0], r = [0, 0, 0], s = 1) => ({ geo, color, p, r, s });
+  const B = (w, h, d, c, x = 0, y = 0, z = 0, r) => part(new THREE.BoxGeometry(w, h, d), c, [x, y, z], r);
+  const Zc = (rt, rb, len, c, x = 0, y = 0, z = 0, seg = 10) => part(new THREE.CylinderGeometry(rt, rb, len, seg), c, [x, y, z], [Math.PI / 2, 0, 0]);
+  const Zk = (r, len, c, x = 0, y = 0, z = 0, seg = 10) => part(new THREE.ConeGeometry(r, len, seg), c, [x, y, z], [Math.PI / 2, 0, 0]);
+  const Xc = (r, len, c, x = 0, y = 0, z = 0, seg = 8) => part(new THREE.CylinderGeometry(r, r, len, seg), c, [x, y, z], [0, 0, Math.PI / 2]);
+  const D = (r, h, c, x = 0, y = 0, z = 0, seg = 24) => part(new THREE.CylinderGeometry(r, r, h, seg), c, [x, y, z]);
+  const S = (r, c, x = 0, y = 0, z = 0, s = 1, seg = 12) => part(new THREE.SphereGeometry(r, seg, Math.max(5, (seg * 0.6) | 0)), c, [x, y, z], [0, 0, 0], s);
+  const T = (R, r, c, x = 0, y = 0, z = 0) => part(new THREE.TorusGeometry(R, r, 6, 28), c, [x, y, z], [Math.PI / 2, 0, 0]);
+  const W = (w, h, l, c, x = 0, y = 0, z = 0) => part(wedgeGeo(w, h, l), c, [x, y, z]);
+  const E = (x, y, z, s, c) => ({ p: [x, y, z], s, c });
+  const sides = [-1, 1];
+
+  // Enterprise: parámetros para variar entre la serie y el refit de las películas
+  const enterprise = (o) => {
+    const parts = [
+      D(o.sr, 0.035, o.c, 0, 0.06, o.sz, 28), S(0.05, '#9fb0c8', 0, 0.085, o.sz, [1, 0.4, 1]),
+      B(0.06, 0.14, 0.12, o.c, 0, -0.02, o.sz - 0.2),
+      Zc(0.07, 0.055, o.hl, o.c, 0, -0.1, -0.12, 12), S(0.04, '#9fd0ff', 0, -0.1, -0.12 + o.hl / 2, [1, 1, 0.5]),
+    ];
+    const engines = [];
+    for (const sx of sides) {
+      parts.push(Zc(0.032, 0.032, o.nl, o.nc, sx * o.nx, o.ny, o.nz, 10), S(0.03, REDG, sx * o.nx, o.ny, o.nz + o.nl / 2, 1, 8),
+        B(0.17, 0.015, 0.1, o.c, sx * o.nx / 2, (o.ny - 0.1) / 2, o.nz + 0.02, [0, 0, sx * o.pa]));
+      engines.push(E(sx * o.nx, o.ny, o.nz - o.nl / 2, 0.08, BLUE));
+    }
+    return { parts, engines };
+  };
+
+  return {
+    falcon: () => ({
+      parts: [
+        D(0.42, 0.09, '#bdbab0', 0, 0, -0.06, 24), B(0.11, 0.07, 0.42, '#a9a69c', 0.13, 0, 0.42), B(0.11, 0.07, 0.42, '#a9a69c', -0.13, 0, 0.42),
+        Zc(0.05, 0.05, 0.32, '#cdcabf', 0.44, 0, 0.12, 8), Zk(0.05, 0.08, '#cdcabf', 0.44, 0, 0.32, 8), D(0.07, 0.03, '#6b6962', -0.12, 0.06, -0.04, 10),
+      ], engines: [E(0, 0, -0.5, 0.16, BLUE)] }),
+    xwing: () => {
+      const parts = [Zc(0.04, 0.05, 0.55, '#dcdad2', 0, 0, 0, 8), Zk(0.04, 0.28, '#dcdad2', 0, 0, 0.415, 8), S(0.045, '#7d8c99', 0, 0.045, 0.05, 1, 8)];
+      const engines = [];
+      for (const sx of sides) for (const sy of sides) {
+        parts.push(B(0.4, 0.012, 0.24, '#dcdad2', sx * 0.24, sy * 0.075, -0.12, [0, 0, sx * sy * 0.26]),
+          Zc(0.034, 0.04, 0.3, '#a6a49c', sx * 0.44, sy * 0.13, -0.12, 8), Zc(0.036, 0.036, 0.04, '#c0392b', sx * 0.44, sy * 0.13, 0.04, 8),
+          Zc(0.007, 0.007, 0.42, '#555', sx * 0.46, sy * 0.14, 0.12, 5));
+        engines.push(E(sx * 0.44, sy * 0.13, -0.28, 0.05, ORANGE));
+      }
+      return { parts, engines };
+    },
+    ywing: () => ({
+      parts: [B(0.1, 0.08, 0.5, '#b8ad8e', 0, 0, 0.05), S(0.07, '#a89d7e', 0, 0.05, 0.28, [1, 0.8, 1.4]),
+        Zc(0.06, 0.06, 0.7, '#8d8b85', 0.2, 0, -0.15), Zc(0.06, 0.06, 0.7, '#8d8b85', -0.2, 0, -0.15),
+        B(0.2, 0.03, 0.14, '#b8ad8e', 0.1, 0, 0), B(0.2, 0.03, 0.14, '#b8ad8e', -0.1, 0, 0), Zc(0.02, 0.02, 0.5, '#9a9a96', 0, 0, -0.3, 6)],
+      engines: [E(0.2, 0, -0.52, 0.09, ORANGE), E(-0.2, 0, -0.52, 0.09, ORANGE)] }),
+    awing: () => {
+      const parts = [part(new THREE.ConeGeometry(0.2, 0.8, 4), '#b03a2e', [0, 0, 0.1], [Math.PI / 2, Math.PI / 4, 0], [1.5, 1, 0.35]),
+        S(0.06, '#4c6a88', 0, 0.045, 0.05, [1, 0.8, 1.6], 8)];
+      const engines = [];
+      for (const sx of sides) { parts.push(Zc(0.05, 0.06, 0.3, '#8a8f95', sx * 0.2, 0, -0.25, 8)); engines.push(E(sx * 0.2, 0, -0.42, 0.07, BLUE)); }
+      return { parts, engines };
+    },
+    slave1: () => ({
+      parts: [Zc(0.12, 0.12, 0.6, '#6b7a5a', 0, 0, 0, 12), S(0.1, '#8a9a78', 0, 0, 0.32, [1, 1, 1.1]), S(0.05, '#2a3a44', 0, 0.06, 0.36, [1, 0.6, 1], 8),
+        B(0.02, 0.28, 0.22, '#5f6e50', 0, 0.12, -0.2), B(0.3, 0.02, 0.18, '#5f6e50', 0, 0, -0.18), Zc(0.012, 0.012, 0.35, '#444', 0.16, 0, 0.32, 5), Zc(0.012, 0.012, 0.35, '#444', -0.16, 0, 0.32, 5)],
+      engines: [E(0, 0, -0.34, 0.12, ORANGE)] }),
+    lambda: () => ({
+      parts: [B(0.12, 0.2, 0.55, '#c8cbd0', 0, 0, 0.05), B(0.1, 0.12, 0.15, '#aab0b8', 0, 0, 0.36), B(0.025, 0.55, 0.32, '#c8cbd0', 0, 0.3, -0.05),
+        B(0.4, 0.012, 0.26, '#d6d9de', 0.17, 0.2, -0.1, [0, 0, 0.9]), B(0.4, 0.012, 0.26, '#d6d9de', -0.17, 0.2, -0.1, [0, 0, -0.9])],
+      engines: [E(0, 0, -0.26, 0.1, BLUE)] }),
+    deathstar: () => {
+      const dir = new THREE.Vector3(0.45, 0.38, 0.81).normalize();
+      const q = new THREE.Quaternion().setFromUnitVectors(new THREE.Vector3(0, 1, 0), dir), eu = new THREE.Euler().setFromQuaternion(q);
+      return { parts: [S(0.5, '#8d9096', 0, 0, 0, 1, 22), T(0.502, 0.012, '#4d5056'),
+        part(new THREE.CylinderGeometry(0.13, 0.13, 0.05, 18), '#3d4349', dir.clone().multiplyScalar(0.5).toArray(), [eu.x, eu.y, eu.z]),
+        part(new THREE.CylinderGeometry(0.05, 0.05, 0.06, 12), '#6f8f62', dir.clone().multiplyScalar(0.5).toArray(), [eu.x, eu.y, eu.z])], engines: [] };
+    },
+    destroyer: () => ({
+      parts: [W(0.62, 0.1, 1, '#9ba1a9'), B(0.12, 0.07, 0.14, '#8b9199', 0, 0.1, -0.38), S(0.032, '#aab0b8', 0.045, 0.16, -0.38, 1, 8), S(0.032, '#aab0b8', -0.045, 0.16, -0.38, 1, 8),
+        B(0.3, 0.02, 0.3, '#8b9199', 0, 0.05, -0.2)],
+      engines: [E(-0.18, 0.03, -0.5, 0.09, BLUE), E(0, 0.03, -0.5, 0.1, BLUE), E(0.18, 0.03, -0.5, 0.09, BLUE)] }),
+    tie: () => ({
+      parts: [S(0.07, '#555961', 0, 0, 0, 1, 10), S(0.03, '#8aa0b4', 0, 0, 0.055, 1, 6),
+        part(new THREE.CylinderGeometry(0.24, 0.24, 0.018, 6), '#35373d', [0.18, 0, 0], [0, 0, Math.PI / 2]), part(new THREE.CylinderGeometry(0.24, 0.24, 0.018, 6), '#35373d', [-0.18, 0, 0], [0, 0, Math.PI / 2]),
+        Xc(0.012, 0.14, '#666a72', 0.1, 0, 0, 6), Xc(0.012, 0.14, '#666a72', -0.1, 0, 0, 6)], engines: [E(0, 0, -0.08, 0.04, REDG)] }),
+    enterpriseD: () => enterprise({ c: '#cfd2d6', sr: 0.3, sz: 0.22, hl: 0.38, nl: 0.45, nc: '#b8bcc4', nx: 0.2, ny: 0.05, nz: -0.4, pa: 0.6 }),
+    enterpriseRefit: () => enterprise({ c: '#c6c9ce', sr: 0.27, sz: 0.24, hl: 0.46, nl: 0.52, nc: '#aeb2ba', nx: 0.19, ny: 0.1, nz: -0.46, pa: 0.9 }),
+    bop: () => {
+      const g = '#5f8a58', parts = [S(0.11, g, 0, 0, 0.38, [1, 0.6, 1.5]), Zc(0.04, 0.05, 0.34, '#52764c', 0, 0, 0.1, 8), S(0.1, '#6b9a63', 0, 0, -0.02, [1.3, 0.5, 1.2])];
+      const engines = [];
+      for (const sx of sides) { parts.push(B(0.5, 0.012, 0.34, g, sx * 0.3, -0.05, -0.05, [0, 0, -sx * 0.28]), Zc(0.012, 0.012, 0.3, '#444', sx * 0.5, -0.1, 0.1, 5)); engines.push(E(sx * 0.1, 0, -0.2, 0.07, GREENG)); }
+      return { parts, engines };
+    },
+    voyager: () => {
+      const c = '#b5bac2', parts = [D(0.17, 0.03, c, 0, 0.04, 0.28, 22), S(0.04, '#9fb0c8', 0, 0.06, 0.28, [1, 0.5, 1], 8), B(0.14, 0.07, 0.5, c, 0, 0, -0.02), B(0.1, 0.05, 0.2, '#a4a9b1', 0, 0, -0.3)];
+      const engines = [];
+      for (const sx of sides) { parts.push(Zc(0.03, 0.03, 0.4, '#a9aeb8', sx * 0.2, 0.1, -0.3, 8), B(0.16, 0.012, 0.08, c, sx * 0.1, 0.05, -0.3, [0, 0, sx * 0.5]), S(0.026, REDG, sx * 0.2, 0.1, -0.1, 1, 6)); engines.push(E(sx * 0.2, 0.1, -0.5, 0.07, BLUE)); }
+      return { parts, engines };
+    },
+    galactica: () => ({
+      parts: [B(0.12, 0.1, 0.9, '#8a8f96'), B(0.16, 0.08, 0.3, '#7d838b', 0, 0, 0.4), B(0.1, 0.1, 0.55, '#757b83', 0.12, -0.03, -0.1), B(0.1, 0.1, 0.55, '#757b83', -0.12, -0.03, -0.1),
+        Zc(0.012, 0.012, 0.16, '#777', 0, 0.12, -0.3, 5), S(0.06, '#9aa0a8', 0, 0.16, -0.3, 1, 8), B(0.06, 0.04, 0.2, '#9aa0a8', 0, 0.07, 0.38)],
+      engines: [E(0, 0, -0.46, 0.08, ORANGE), E(0.1, -0.03, -0.46, 0.07, ORANGE), E(-0.1, -0.03, -0.46, 0.07, ORANGE)] }),
+    viper: () => {
+      const parts = [Zc(0.04, 0.05, 0.4, '#b8b4a8', 0, 0, 0.02, 8), Zk(0.04, 0.16, '#b8b4a8', 0, 0, 0.3, 8), S(0.03, '#4a6a88', 0, 0.035, 0.1, [1, 0.8, 1.5], 6)];
+      const engines = [];
+      for (const sx of sides) { parts.push(B(0.3, 0.01, 0.18, '#9e9a8e', sx * 0.16, 0, -0.1, [0, 0, sx * 0.1]), Zc(0.035, 0.04, 0.2, '#706c62', sx * 0.08, 0, -0.18, 8)); engines.push(E(sx * 0.08, 0, -0.29, 0.05, ORANGE)); }
+      return { parts, engines };
+    },
+    raider: () => ({ parts: [W(0.42, 0.03, 0.6, '#555a60'), B(0.1, 0.04, 0.2, '#3d4147', 0, 0.03, -0.15), S(0.02, REDG, 0, 0.02, 0.28, 1, 6)], engines: [E(0, 0, 0.3, 0.05, REDG)] }),
+    nostromo: () => {
+      const parts = [B(0.34, 0.09, 0.42, '#8c7d66', 0, 0, 0.35), W(0.3, 0.04, 0.2, '#7a6c58', 0, 0, 0.6), B(0.5, 0.04, 0.6, '#5d5547', 0, -0.07, -0.25)];
+      for (const gx of [-0.15, 0, 0.15]) for (const gz of [-0.1, -0.28, -0.46]) parts.push(part(new THREE.CylinderGeometry(0.045, 0.045, 0.3, 6), '#6e6556', [gx, 0.08, gz]));
+      return { parts, engines: [E(-0.12, 0, -0.58, 0.07, ORANGE), E(0.12, 0, -0.58, 0.07, ORANGE)] };
+    },
+    sulaco: () => ({
+      parts: [B(0.16, 0.12, 0.8, '#79818a'), W(0.16, 0.1, 0.3, '#6a727b', 0, -0.02, 0.55), B(0.22, 0.1, 0.3, '#656d76', 0, 0.07, -0.3), B(0.3, 0.04, 0.22, '#5d656e', 0, 0, -0.3),
+        Zc(0.05, 0.05, 0.2, '#505760', 0.14, 0, -0.45), Zc(0.05, 0.05, 0.2, '#505760', -0.14, 0, -0.45)],
+      engines: [E(0.14, 0, -0.56, 0.08, ORANGE), E(-0.14, 0, -0.56, 0.08, ORANGE)] }),
+    et: () => {
+      const parts = [S(0.33, '#8a6c52', 0, 0, 0, [1, 0.55, 1], 16), T(0.33, 0.02, '#b79a7a'), S(0.12, '#a08166', 0, 0.14, 0, [1, 0.7, 1], 10)];
+      for (let i = 0; i < 6; i++) { const a = i / 6 * TAU; parts.push(S(0.025, '#ffd9a0', Math.cos(a) * 0.34, 0, Math.sin(a) * 0.34, 1, 5)); }
+      return { parts, engines: [E(0, -0.16, 0, 0.18, '#ffcf8a')] };
+    },
+    alf: () => ({
+      parts: [D(0.3, 0.05, '#8c98a6', 0, 0, 0, 24), S(0.12, '#9fb4c8', 0, 0.07, 0, [1, 0.7, 1], 10), B(0.04, 0.1, 0.12, '#7a8694', 0, 0.03, -0.24),
+        Zc(0.015, 0.015, 0.1, '#667', 0.18, -0.07, 0.0, 5), Zc(0.015, 0.015, 0.1, '#667', -0.09, -0.07, 0.16, 5), Zc(0.015, 0.015, 0.1, '#667', -0.09, -0.07, -0.16, 5)],
+      engines: [E(0, -0.04, 0, 0.12, CYAN)] }),
+    delorean: () => {
+      const parts = [B(0.18, 0.06, 0.42, '#b8bcc0'), B(0.15, 0.05, 0.14, '#3a4352', 0, 0.055, -0.02), B(0.16, 0.03, 0.08, '#a9adb1', 0, 0.02, 0.18)];
+      const engines = [];
+      for (const sx of sides) for (const sz of [-0.13, 0.14]) { parts.push(part(new THREE.CylinderGeometry(0.04, 0.04, 0.03, 10), '#2e3238', [sx * 0.1, -0.045, sz])); engines.push(E(sx * 0.1, -0.07, sz, 0.05, ORANGE)); }
+      return { parts, engines };
+    },
+    eagle5: () => ({
+      parts: [B(0.22, 0.2, 0.5, '#ece9e1', 0, 0, -0.1), B(0.2, 0.14, 0.22, '#e4e1d9', 0, -0.03, 0.26), S(0.11, '#bcd4e8', 0, 0.03, 0.36, [1, 0.7, 1], 10),
+        B(0.222, 0.025, 0.3, '#c0392b', 0, 0, -0.1), Zc(0.06, 0.07, 0.2, '#8c8a85', 0.07, -0.03, -0.4), Zc(0.06, 0.07, 0.2, '#8c8a85', -0.07, -0.03, -0.4)],
+      engines: [E(0.07, -0.03, -0.52, 0.1, ORANGE), E(-0.07, -0.03, -0.52, 0.1, ORANGE)] }),
+    spaceball: () => ({
+      parts: [B(0.5, 0.22, 0.9, '#b7b4a7'), W(0.5, 0.18, 0.5, '#a8a598', 0, -0.02, 0.6), B(0.3, 0.18, 0.25, '#c3c0b2', 0, 0.18, -0.3), B(0.28, 0.06, 0.02, '#2d3b4a', 0, 0.2, -0.17),
+        Zc(0.07, 0.08, 0.15, '#5f5d55', 0.15, 0, -0.5), Zc(0.07, 0.08, 0.15, '#5f5d55', -0.15, 0, -0.5)],
+      engines: [E(0.15, 0, -0.6, 0.1, ORANGE), E(-0.15, 0, -0.6, 0.1, ORANGE)] }),
+    mothership: () => ({
+      parts: [D(0.5, 0.05, '#5f5c59', 0, 0, 0, 36), T(0.5, 0.025, '#4a4745'), S(0.15, '#6c6966', 0, 0.05, 0, [1, 0.5, 1], 12),
+        part(new THREE.ConeGeometry(0.4, 0.35, 20), '#55524f', [0, -0.2, 0], [Math.PI, 0, 0]), part(new THREE.ConeGeometry(0.12, 0.25, 14), '#3c3a38', [0, -0.5, 0], [Math.PI, 0, 0])],
+      engines: [E(0, -0.62, 0, 0.16, CYAN)] }),
+    attacker: () => ({ parts: [Zc(0.025, 0.03, 0.28, '#6a6a6e', 0, 0, 0, 6), W(0.34, 0.015, 0.3, '#585a60', 0, 0, -0.05), S(0.02, '#9be8ff', 0, 0.015, 0.1, 1, 5)], engines: [E(0, 0, -0.2, 0.05, CYAN)] }),
+    macross: () => ({
+      parts: [B(0.22, 0.2, 0.7, '#8795a3'), B(0.08, 0.14, 0.2, '#9aa6b2', 0, 0.16, 0.2), B(0.1, 0.12, 0.7, '#778593', 0.2, 0, 0.12), B(0.1, 0.12, 0.7, '#778593', -0.2, 0, 0.12),
+        Zc(0.03, 0.03, 0.3, '#555b62', 0, 0, 0.5, 8), Zk(0.05, 0.12, '#9aa6b2', 0.2, 0, 0.52), Zk(0.05, 0.12, '#9aa6b2', -0.2, 0, 0.52)],
+      engines: [E(0.08, 0, -0.38, 0.09, BLUE), E(-0.08, 0, -0.38, 0.09, BLUE), E(0.2, 0, -0.26, 0.07, BLUE), E(-0.2, 0, -0.26, 0.07, BLUE)] }),
+    ark: () => ({
+      parts: [Zc(0.1, 0.1, 0.55, '#a7afb7', 0, 0, -0.05), Zk(0.1, 0.3, '#c0392b', 0, 0, 0.375), B(0.36, 0.015, 0.25, '#8d959d', 0, 0, -0.25), B(0.015, 0.3, 0.25, '#8d959d', 0, 0.12, -0.25),
+        Zc(0.05, 0.06, 0.12, '#555b62', 0.12, 0, -0.38, 8), Zc(0.05, 0.06, 0.12, '#555b62', -0.12, 0, -0.38, 8)],
+      engines: [E(0.12, 0, -0.46, 0.08, ORANGE), E(-0.12, 0, -0.46, 0.08, ORANGE), E(0, 0, -0.36, 0.09, ORANGE)] }),
+    heartgold: () => ({ parts: [S(0.2, '#f4f4f2', 0, 0, 0, [0.5, 0.35, 1.4], 16), Zc(0.04, 0.05, 0.08, '#cfd3d8', 0, 0, -0.3, 8)], engines: [E(0, 0, -0.36, 0.1, PINK)] }),
+    liberator: () => ({
+      parts: [S(0.14, '#c3c9d0', 0, 0, 0, [1.1, 0.7, 1.8], 14), T(0.25, 0.02, '#9aa2ab'), S(0.07, '#8fb1d9', 0.22, 0, 0, [1, 0.6, 1.2], 8), S(0.07, '#8fb1d9', -0.22, 0, 0, [1, 0.6, 1.2], 8),
+        Zc(0.05, 0.05, 0.3, '#aab2bb', 0.1, 0, -0.3), Zc(0.05, 0.05, 0.3, '#aab2bb', -0.1, 0, -0.3)],
+      engines: [E(0.1, 0, -0.46, 0.07, BLUE), E(-0.1, 0, -0.46, 0.07, BLUE)] }),
+    buckrogers: () => ({
+      parts: [W(0.5, 0.04, 0.6, '#d6dce2', 0, 0, 0.1), S(0.06, '#4a78b8', 0, 0.04, 0.15, [1, 0.6, 1.8], 8), Zc(0.05, 0.055, 0.3, '#9aa3ad', 0.1, 0, -0.2), Zc(0.05, 0.055, 0.3, '#9aa3ad', -0.1, 0, -0.2),
+        B(0.015, 0.1, 0.14, '#3f6cb0', 0.2, 0.05, -0.15), B(0.015, 0.1, 0.14, '#3f6cb0', -0.2, 0.05, -0.15)],
+      engines: [E(0.1, 0, -0.36, 0.07, BLUE), E(-0.1, 0, -0.36, 0.07, BLUE)] }),
+    mondo: () => ({
+      parts: [S(0.15, '#b9b7a4', 0, 0, 0, [0.8, 0.6, 2.4]), Zc(0.115, 0.115, 0.03, '#b48a3c', 0, 0, 0.2, 12), Zc(0.115, 0.115, 0.03, '#b48a3c', 0, 0, -0.1, 12), W(0.5, 0.02, 0.3, '#a7a592', 0, 0, -0.2)],
+      engines: [E(0, 0, -0.4, 0.1, ORANGE)] }),
+    starbug: () => ({
+      parts: [B(0.2, 0.11, 0.42, '#6f9a5e'), W(0.2, 0.09, 0.26, '#5f8a50', 0, 0, 0.3), B(0.12, 0.04, 0.02, '#27323d', 0, 0.04, 0.4), Zc(0.05, 0.05, 0.12, '#44563a', 0.08, 0, -0.26), Zc(0.05, 0.05, 0.12, '#44563a', -0.08, 0, -0.26)],
+      engines: [E(0.08, 0, -0.34, 0.06, ORANGE), E(-0.08, 0, -0.34, 0.06, ORANGE)] }),
+    zathura: () => ({   // casa suburbana arrancada del suelo: paredes, tejado a cuatro aguas, chimenea y un bloque de tierra debajo
+      parts: [B(0.4, 0.28, 0.34, '#dcc9a0'), part(new THREE.ConeGeometry(0.3, 0.2, 4), '#7a4a3a', [0, 0.24, 0], [0, Math.PI / 4, 0], [1.05, 1, 0.9]),
+        B(0.05, 0.14, 0.05, '#8a5a4a', 0.1, 0.3, -0.05), B(0.1, 0.15, 0.03, '#5a3a2a', 0, -0.06, 0.18), B(0.07, 0.07, 0.01, '#7fb4d8', 0.12, 0.05, 0.172), B(0.07, 0.07, 0.01, '#7fb4d8', -0.12, 0.05, 0.172),
+        part(new THREE.ConeGeometry(0.22, 0.2, 7), '#5d4a35', [0, -0.24, 0], [Math.PI, 0, 0]), part(new THREE.DodecahedronGeometry(0.05), '#6b5640', [0.12, -0.34, 0.04])],
+      engines: [E(0, -0.38, 0, 0.14, ORANGE)] }),
+    zorgon: () => ({
+      parts: [D(0.4, 0.07, '#4f544c', 0, 0, 0, 28), D(0.3, 0.05, '#3c403a', 0, 0.06, 0, 24), S(0.12, '#a83a2a', 0, 0.1, 0, [1, 0.7, 1], 10), T(0.4, 0.02, '#2f332d', 0, -0.01, 0),
+        B(0.08, 0.06, 0.2, '#3c403a', 0, 0, -0.42), Zc(0.05, 0.06, 0.14, '#2a2d28', 0.12, 0, -0.44), Zc(0.05, 0.06, 0.14, '#2a2d28', -0.12, 0, -0.44),
+        S(0.025, REDG, 0.3, 0.02, 0.2, 1, 5), S(0.025, REDG, -0.3, 0.02, 0.2, 1, 5), S(0.025, REDG, 0, 0.02, 0.4, 1, 5)],
+      engines: [E(0.12, 0, -0.52, 0.09, ORANGE), E(-0.12, 0, -0.52, 0.09, ORANGE)] }),
+    predator: () => {   // casco oscuro y alargado con alas en flecha hacia atrás
+      const parts = [S(0.12, '#3a3f45', 0, 0, 0, [0.9, 0.35, 2.4], 14), Zk(0.05, 0.3, '#2e3237', 0, 0, 0.48), B(0.03, 0.06, 0.5, '#2a2e33', 0, 0.05, -0.05), S(0.02, REDG, 0.03, 0.04, 0.38, 1, 5), S(0.02, REDG, -0.03, 0.04, 0.38, 1, 5)];
+      const engines = [];
+      for (const sx of sides) { parts.push(B(0.42, 0.02, 0.2, '#2e3237', sx * 0.24, 0, -0.08, [0, sx * 0.5, 0]), Zc(0.03, 0.035, 0.2, '#23262a', sx * 0.38, 0, -0.32)); engines.push(E(sx * 0.38, 0, -0.43, 0.07, '#7dffc8')); }
+      return { parts, engines };
+    },
+    prometheus: () => {   // cuerpo cilíndrico, proa abultada, placa ancha delantera, bloque trasero y cuatro motores
+      const parts = [Zc(0.09, 0.1, 0.8, '#aeb4bb', 0, 0, 0, 14), S(0.11, '#9aa3ab', 0, 0, 0.38, [1, 0.8, 0.9]), B(0.46, 0.02, 0.16, '#8f979f', 0, 0, 0.2), B(0.22, 0.14, 0.2, '#7c848c', 0, 0, -0.38),
+        B(0.1, 0.02, 0.03, '#6fd0ff', 0, 0.05, 0.46), B(0.02, 0.1, 0.12, '#7c848c', 0.16, -0.06, 0.2), B(0.02, 0.1, 0.12, '#7c848c', -0.16, -0.06, 0.2)];
+      const engines = [];
+      for (const sx of sides) for (const sy of sides) { parts.push(Zc(0.04, 0.05, 0.16, '#5d646b', sx * 0.09, sy * 0.05, -0.52)); engines.push(E(sx * 0.09, sy * 0.05, -0.62, 0.05, ORANGE)); }
+      return { parts, engines };
+    },
+  };
+})();
+
+/* Fusiona las partes en una única BufferGeometry con color por vértice y la normaliza. */
+const modelCache = {};
+function getModel(key) {
+  if (modelCache[key]) return modelCache[key];
+  const spec = MODELS[key](), pos = [], nor = [], col = [], c = new THREE.Color();
+  const m = new THREE.Matrix4(), q = new THREE.Quaternion(), e = new THREE.Euler(), p = new THREE.Vector3(), s = new THREE.Vector3();
+  for (const pt of spec.parts) {
+    const g = pt.geo.index ? pt.geo.toNonIndexed() : pt.geo.clone();
+    e.set(pt.r[0], pt.r[1], pt.r[2]); q.setFromEuler(e);
+    const sc = typeof pt.s === 'number' ? [pt.s, pt.s, pt.s] : pt.s;
+    m.compose(p.set(pt.p[0], pt.p[1], pt.p[2]), q, s.set(sc[0], sc[1], sc[2])); g.applyMatrix4(m);
+    c.set(pt.color);
+    const P = g.attributes.position.array, N = g.attributes.normal.array;
+    for (let i = 0; i < P.length; i += 3) { pos.push(P[i], P[i + 1], P[i + 2]); nor.push(N[i], N[i + 1], N[i + 2]); col.push(c.r, c.g, c.b); }
+    pt.geo.dispose(); g.dispose();
+  }
+  const mn = [Infinity, Infinity, Infinity], mx = [-Infinity, -Infinity, -Infinity];
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) { mn[k] = Math.min(mn[k], pos[i + k]); mx[k] = Math.max(mx[k], pos[i + k]); }
+  const ctr = mn.map((v, k) => (v + mx[k]) / 2), dim = Math.max(mx[0] - mn[0], mx[1] - mn[1], mx[2] - mn[2]);
+  for (let i = 0; i < pos.length; i += 3) for (let k = 0; k < 3; k++) pos[i + k] = (pos[i + k] - ctr[k]) / dim;
+  const geo = new THREE.BufferGeometry();
+  geo.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  geo.setAttribute('normal', new THREE.Float32BufferAttribute(nor, 3));
+  geo.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  const engines = spec.engines.map(en => ({ p: new THREE.Vector3(en.p[0] - ctr[0], en.p[1] - ctr[1], en.p[2] - ctr[2]).divideScalar(dim), s: en.s / dim, c: en.c }));
+  return (modelCache[key] = { geo, engines });
+}
+
+/* =====================================================================
+   NAVES — 3. ENTIDADES, VIAJES ALEATORIOS (máquina de estados) Y FLOTAS
+   Todo se calcula en el espacio de `root` (Sol en el origen) y con el tiempo simulado
+   `simSeconds`, así que respeta pausa y velocidad y no depende de los FPS.
+   Estados: parked (estación en órbita lenta) → orbit (5-15 s) → travel (10-40 s) → orbit …
+   ===================================================================== */
+const rand = (a = 0, b = 1) => a + Math.random() * (b - a);
+const clampN = (v, a, b) => Math.max(a, Math.min(b, v));
+const shipLayer = new THREE.Group(); root.add(shipLayer);
+const shipMat = new THREE.MeshLambertMaterial({ vertexColors: true, emissive: 0x2a2a30, side: THREE.DoubleSide });
+const dotTex = (() => { // punto blando para brillos de motor
+  const s = 64, cv = document.createElement('canvas'); cv.width = cv.height = s;
+  const ctx = cv.getContext('2d'), g = ctx.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2);
+  g.addColorStop(0, 'rgba(255,255,255,1)'); g.addColorStop(0.35, 'rgba(255,255,255,0.4)'); g.addColorStop(1, 'rgba(255,255,255,0)');
+  ctx.fillStyle = g; ctx.fillRect(0, 0, s, s); return new THREE.CanvasTexture(cv);
+})();
+const spriteMats = {}, glowMats = {};
+const spriteMat = c => spriteMats[c] || (spriteMats[c] = new THREE.SpriteMaterial({ map: dotTex, color: c, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.7 }));
+const glowMat = c => glowMats[c] || (glowMats[c] = new THREE.MeshBasicMaterial({ color: c, blending: THREE.AdditiveBlending, transparent: true, depthWrite: false, opacity: 0.75 }));
+const glowSphere = new THREE.SphereGeometry(1, 6, 4);
+
+/* ---- Destinos: planetas y lunas (posición analítica en cualquier instante t) ---- */
+function planetPos(p, t, out) {
+  const ang = p.phase + TAU * (t / EARTH_YEAR_SECONDS) / p.def.period;
+  return out.set(Math.cos(ang) * p.def.orbitR, 0, -Math.sin(ang) * p.def.orbitR);
+}
+function moonPos(p, m, t, out) {
+  const a = m.phase + TAU * t / m.def.period, x = Math.cos(a) * m.def.orbit, z = -Math.sin(a) * m.def.orbit;
+  if (p.def.eqMoons) { const th = THREE.MathUtils.degToRad(p.def.tilt); out.set(x * Math.cos(th), x * Math.sin(th), z); } else out.set(x, 0, z);
+  return out.add(planetPos(p, t, _tp));
+}
+const _tp = new THREE.Vector3();
+const TARGETS = [];
+for (const p of planets) {
+  TARGETS.push({ name: p.def.name, radius: p.def.radius, w: 1, isMoon: false, pos: (t, o) => planetPos(p, t, o) });
+  for (const m of p.moons) TARGETS.push({ name: m.def.name, radius: m.def.radius, w: 0.22, isMoon: true, pos: (t, o) => moonPos(p, m, t, o) });
+}
+const PLANET_TARGETS = TARGETS.filter(t => !t.isMoon);
+
+/* ---- Formaciones (V, línea, enjambre) en el sistema local de la nave líder: +Z = adelante ---- */
+function slotOffset(form, j, cap, sp, capLen, total) {
+  if (form === 'swarm') {
+    const th = Math.acos(1 - 2 * Math.random()), ph = rand(0, TAU);
+    const r = cap ? capLen * rand(0.8, 1.4) + sp : sp * rand(0.7, 2.4) * (1 + total * 0.05);
+    return new THREE.Vector3(Math.sin(th) * Math.cos(ph) * r * 1.2, Math.cos(th) * r * 0.45, Math.sin(th) * Math.sin(ph) * r * 1.1);
+  }
+  const behind = cap ? capLen * 0.45 + sp * 0.6 : 0;
+  if (form === 'line') return new THREE.Vector3(0, 0, -(cap ? j + 1 : j) * sp - behind);
+  const k = cap ? Math.floor(j / 2) + 1 : Math.ceil(j / 2), side = j % 2 ? 1 : -1;
+  return new THREE.Vector3(side * k * sp, 0, -k * sp * 0.8 - behind);
+}
+
+let sunMin = Infinity;   // mínima distancia al Sol observada (para pruebas)
+const ships = [];
+SHIPS.forEach(def => {
+  const e = {
+    def, id: def.id, label: `${def.name} — ${def.work} (${def.year})`, group: new THREE.Group(),
+    pos: new THREE.Vector3(), prev: new THREE.Vector3(), q: new THREE.Quaternion(), heading: new THREE.Vector3(0, 0, 1),
+    len: def.size * SHIP_VIS, visible: true, engines: [], groups: [], slots: [], extent: 0, state: 'orbit', phase: rand(0, TAU),
+  };
+  shipLayer.add(e.group);
+  if (def.model) {
+    const model = getModel(def.model), body = new THREE.Mesh(model.geo, shipMat);
+    body.scale.setScalar(e.len); body.frustumCulled = false; e.group.add(body); e.body = body;
+    for (const en of model.engines) {
+      const sp = new THREE.Sprite(spriteMat(en.c)); sp.position.copy(en.p).multiplyScalar(e.len); sp.userData.base = en.s * 2.8 * e.len; e.group.add(sp); e.engines.push(sp);
+    }
+  }
+  if (def.fleet) { // miembros instanciados: un InstancedMesh por tipo de miembro (+ otro para sus brillos)
+    const f = def.fleet, cap = !!def.model, total = f.members.reduce((a, m) => a + m.n, 0);
+    let j = 0;
+    for (const mem of f.members) {
+      const model = getModel(mem.model), mlen = mem.size * SHIP_VIS, sp = mlen * 2.4 + (cap ? e.len * 0.04 : 0);
+      const inst = new THREE.InstancedMesh(model.geo, shipMat, mem.n); inst.frustumCulled = false; shipLayer.add(inst);
+      let glow = null;
+      if (model.engines.length) { glow = new THREE.InstancedMesh(glowSphere, glowMat(model.engines[0].c), mem.n * model.engines.length); glow.frustumCulled = false; shipLayer.add(glow); }
+      e.groups.push({ model, mlen, inst, glow });
+      for (let i = 0; i < mem.n; i++, j++) {
+        const off = slotOffset(f.formation, j, cap, sp, e.len, total);
+        e.slots.push({ g: e.groups.length - 1, k: i, off, ph: rand(0, TAU) });
+        e.extent = Math.max(e.extent, off.length() + mlen);
+      }
+    }
+    e.formation = f.formation;
+  }
+  e.hitR = Math.max(e.len * 0.55, e.extent + 0.15);
+  const big = Math.max(e.len, e.extent * 1.4);
+  e.followDist = big * 3.4; e.followMin = Math.max(0.04, big * 0.3);
+  hitTargets.push({ name: e.label, obj: e.group, radius: e.hitR, ship: e });
+  ships.push(e);
+});
+const shipById = Object.fromEntries(ships.map(e => [e.id, e]));
+
+/* ---- Estelas de las naves: línea que se desvanece (espacio de `root`) ---- */
+const STRAIL_CAP = 90, STRAIL_DT = 0.15;
+for (const e of ships) {
+  const geo = new THREE.BufferGeometry(), pos = new Float32Array((STRAIL_CAP + 1) * 3), col = new Float32Array((STRAIL_CAP + 1) * 3);
+  geo.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  geo.setAttribute('color', new THREE.BufferAttribute(col, 3).setUsage(THREE.DynamicDrawUsage));
+  const line = new THREE.Line(geo, new THREE.LineBasicMaterial({ vertexColors: true, transparent: true, blending: THREE.AdditiveBlending, depthWrite: false }));
+  line.frustumCulled = false; shipLayer.add(line);
+  e.trail = { geo, pos, col, line, count: 0, last: -1e9, tint: new THREE.Color(e.def.color) };
+}
+function updateShipTrails(t) {
+  for (const e of ships) {
+    const tr = e.trail;
+    if (t - tr.last >= STRAIL_DT && t >= tr.last) {
+      tr.last = t;
+      if (tr.count === STRAIL_CAP) { tr.pos.copyWithin(0, 3, STRAIL_CAP * 3); tr.count--; }
+      tr.pos[tr.count * 3] = e.pos.x; tr.pos[tr.count * 3 + 1] = e.pos.y; tr.pos[tr.count * 3 + 2] = e.pos.z; tr.count++;
+    }
+    const n = tr.count + 1;                           // último vértice = posición actual
+    tr.pos[tr.count * 3] = e.pos.x; tr.pos[tr.count * 3 + 1] = e.pos.y; tr.pos[tr.count * 3 + 2] = e.pos.z;
+    for (let i = 0; i < n; i++) { const k = Math.pow(i / Math.max(1, n - 1), 1.5) * 0.55; tr.col[i * 3] = tr.tint.r * k; tr.col[i * 3 + 1] = tr.tint.g * k; tr.col[i * 3 + 2] = tr.tint.b * k; }
+    tr.geo.setDrawRange(0, n); tr.geo.attributes.position.needsUpdate = true; tr.geo.attributes.color.needsUpdate = true;
+    tr.line.visible = e.visible;
+  }
+}
+
+/* ---- Trayectorias ---- */
+const SUN_SAFE = SUN.radius + 5;                      // distancia mínima al centro del Sol (5 u de margen sobre la superficie)
+const ease = x => 0.2 * x + 0.8 * (x * x * x * (x * (x * 6 - 15) + 10));   // arranque/frenado suaves (smootherstep)
+const _b = new THREE.Vector3(), _c = new THREE.Vector3(), _d = new THREE.Vector3();
+function bez(a, b, c, d, s, out) {
+  const u = 1 - s, w0 = u * u * u, w1 = 3 * u * u * s, w2 = 3 * u * s * s, w3 = s * s * s;
+  return out.set(a.x * w0 + b.x * w1 + c.x * w2 + d.x * w3, a.y * w0 + b.y * w1 + c.y * w2 + d.y * w3, a.z * w0 + b.z * w1 + c.z * w2 + d.z * w3);
+}
+function sunClearance(a, b, c, d) { let m = Infinity; for (let i = 0; i <= 32; i++) m = Math.min(m, bez(a, b, c, d, i / 32, _b).length()); return m; }
+
+function randomPlane(maxInc) {
+  const i = rand(0, maxInc), j = rand(0, TAU), n = new THREE.Vector3(Math.sin(i) * Math.cos(j), Math.cos(i), Math.sin(i) * Math.sin(j));
+  const u = new THREE.Vector3(1, 0, 0).cross(n).normalize(), v = new THREE.Vector3().crossVectors(n, u);
+  return { u, v };
+}
+const orbitRadiusFor = (tg, e) => (tg.isMoon ? tg.radius * 2.4 + 0.3 : tg.radius * 1.4 + 0.45) + e.extent * 0.9 + e.len * 0.4 + rand(0, 0.5);
+function setOrbit(e, tg, t0, end, plane, w, R) {
+  e.state = 'orbit';
+  e.orb = { target: tg, R, w, u: plane.u, v: plane.v, t0, end, dest: null, waitMax: 0 };
+}
+function orbitPos(e, t, out) {
+  const o = e.orb, ph = o.w * (t - o.t0);
+  o.target.pos(t, out);
+  return out.addScaledVector(o.u, Math.cos(ph) * o.R).addScaledVector(o.v, Math.sin(ph) * o.R);
+}
+
+// Elige destino con un sesgo que reparte las naves (menos peso donde ya hay otras)
+function chooseDest(e) {
+  const occ = new Map();
+  for (const s of ships) { if (s === e) continue; const tg = s.state === 'orbit' ? s.orb.target : s.state === 'travel' ? s.tr.dest : null; if (tg) occ.set(tg, (occ.get(tg) || 0) + 1); }
+  let sum = 0; const ws = TARGETS.map(tg => { const w = tg === e.orb.target ? 0 : tg.w / (1 + 1.8 * (occ.get(tg) || 0)); sum += w; return w; });
+  let r = Math.random() * sum;
+  for (let i = 0; i < TARGETS.length; i++) { r -= ws[i]; if (r <= 0) return TARGETS[i]; }
+  return TARGETS[0];
+}
+
+function beginTravel(e, t) {
+  const dest = e.orb.dest, P0 = e.pos.clone(), d0 = e.heading.clone();
+  let T = 20, Pc = new THREE.Vector3();
+  for (let k = 0; k < 3; k++) { dest.pos(t + T, Pc); T = clampN(8 + P0.distanceTo(Pc) * 0.45, 10, 40); }
+  dest.pos(t + T, Pc);
+  const dir = Pc.clone().sub(P0).normalize();
+  const R = orbitRadiusFor(dest, e), w = rand(0.45, 0.8);
+  // órbita de llegada tangente a la trayectoria: v = dirección de viaje, u ⟂ v (casi horizontal, con inclinación aleatoria)
+  let u = new THREE.Vector3().crossVectors(new THREE.Vector3(0, 1, 0), dir);
+  if (u.lengthSq() < 0.04) u.crossVectors(new THREE.Vector3(1, 0, 0), dir);
+  u.normalize().applyAxisAngle(dir, rand(-1, 1)); if (Math.random() < 0.5) u.negate();
+  const P3 = Pc.clone().addScaledVector(u, R), L = P0.distanceTo(P3);
+  const P1 = P0.clone().addScaledVector(d0, L * 0.35), P2 = P3.clone().addScaledVector(dir, -L * 0.3);
+  // desvío del Sol: si la curva pasa demasiado cerca del origen, empuja los puntos de control hacia fuera
+  if (sunClearance(P0, P1, P2, P3) < SUN_SAFE) {
+    const Dv = P3.clone().sub(P0), uu = clampN(-P0.dot(Dv) / Dv.lengthSq(), 0, 1), C = P0.clone().addScaledVector(Dv, uu); C.y = 0;
+    const n = C.length() > 1e-3 ? C.normalize() : new THREE.Vector3(-Dv.z, 0, Dv.x).normalize();
+    const base = P1.clone(), base2 = P2.clone();
+    for (let push = 5; push < 400; push += 5) {
+      P1.copy(base).addScaledVector(n, push); P2.copy(base2).addScaledVector(n, push);
+      if (sunClearance(P0, P1, P2, P3) >= SUN_SAFE) break;
+    }
+  }
+  e.tr = { from: e.orb.target, dest, t0: t, T, t1: t + T, P0, P1, P2, P3, R, w, u, v: dir.clone(), dur: rand(5, 15) };
+  e.state = 'travel';
+}
+
+function updateShip(e, t) {
+  e.prev.copy(e.pos);
+  if (e.state === 'parked') {
+    const a = e.park.ph + e.park.w * t;
+    e.pos.set(Math.cos(a) * e.park.R, 0, -Math.sin(a) * e.park.R);
+  } else if (e.state === 'orbit') {
+    const o = e.orb; orbitPos(e, t, e.pos);
+    if (t >= o.end) {
+      if (!o.dest) { o.dest = chooseDest(e); o.waitMax = t + 1.1 * TAU / Math.abs(o.w); }
+      const est = o.dest.pos(t + 20, _c).sub(e.pos).normalize();
+      if (e.heading.dot(est) > 0.35 || t > o.waitMax) beginTravel(e, t);   // espera a tener el morro hacia el destino
+    }
+  }
+  if (e.state === 'travel') {
+    const tr = e.tr, x = (t - tr.t0) / tr.T;
+    if (x >= 1) {
+      setOrbit(e, tr.dest, tr.t1, tr.t1 + tr.dur, { u: tr.u, v: tr.v }, tr.w, tr.R);
+      orbitPos(e, t, e.pos);
+    } else bez(tr.P0, tr.P1, tr.P2, tr.P3, ease(x), e.pos);
+  }
+  const d = _d.subVectors(e.pos, e.prev);
+  if (d.lengthSq() > 1e-10) e.heading.copy(d).normalize();
+}
+
+/* Estado inicial: cada nave empieza orbitando un planeta distinto (reparto aleatorio); la estación, en órbita lenta */
+function initShips() {
+  const shuffle = a => a.slice().sort(() => Math.random() - 0.5);
+  const order = shuffle(PLANET_TARGETS).concat(shuffle(TARGETS.filter(t => t.isMoon)));   // primero planetas, luego lunas: poca coincidencia inicial
+  ships.forEach((e, i) => {
+    if (e.def.kind === 'station') { e.state = 'parked'; e.park = { R: 70, w: TAU / 420, ph: rand(0, TAU) }; }
+    else {
+      const tg = order[i % order.length], plane = randomPlane(0.6);
+      setOrbit(e, tg, -rand(0, 8), rand(1, 13), plane, rand(0.45, 0.8) * (Math.random() < 0.5 ? -1 : 1), orbitRadiusFor(tg, e));
+    }
+    updateShip(e, 0); e.prev.copy(e.pos);
+    const e2 = e.state === 'parked' ? new THREE.Vector3(Math.cos(e.park.ph + e.park.w * 0.1) * e.park.R, 0, -Math.sin(e.park.ph + e.park.w * 0.1) * e.park.R) : orbitPos(e, 0.1, new THREE.Vector3());
+    e.heading.copy(e2).sub(e.pos).normalize();
+    e.q.copy(headingQuat(e.heading, new THREE.Quaternion()));
+  });
+}
+const _M = new THREE.Matrix4(), _Z = new THREE.Vector3(), _UP = new THREE.Vector3(0, 1, 0);
+function headingQuat(h, out) { _M.lookAt(h, _Z, _UP); return out.setFromRotationMatrix(_M); }
+
+/* ---- Actualización por frame: posición, orientación, brillos y flotas ---- */
+const _qt = new THREE.Quaternion(), _qm = new THREE.Quaternion(), _qy = new THREE.Quaternion(), _off = new THREE.Vector3(), _mp = new THREE.Vector3(), _ms = new THREE.Vector3(), _ge = new THREE.Vector3(), _gs = new THREE.Vector3();
+function updateShips(t, dt, now) {
+  const k = 1 - Math.exp(-dt * 9);
+  for (const e of ships) {
+    updateShip(e, t);
+    if (e.state !== 'parked') sunMin = Math.min(sunMin, e.pos.length());
+    e.q.slerp(headingQuat(e.heading, _qt), k);
+    e.group.position.copy(e.pos); e.group.quaternion.copy(e.q);
+    const thrust = e.state === 'travel' ? 1 : e.state === 'orbit' ? 0.55 : 0.4;
+    for (const sp of e.engines) { const s = sp.userData.base * (0.8 + 0.5 * thrust) * (1 + 0.12 * Math.sin(now / 90 + e.phase)); sp.scale.set(s, s, 1); }
+    if (e.slots.length) updateFleet(e, t);
+  }
+}
+function updateFleet(e, t) {
+  const swarm = e.formation === 'swarm', ang = swarm ? t * 0.35 : 0;
+  if (swarm) _qy.setFromAxisAngle(_UP, ang);
+  for (const g of e.groups) { g.cnt = 0; g.gcnt = 0; }
+  for (const s of e.slots) {
+    const g = e.groups[s.g];
+    _off.copy(s.off); if (swarm) _off.applyQuaternion(_qy);
+    _off.y += Math.sin(t * 1.3 + s.ph) * (swarm ? 0.08 : 0.04) * g.mlen * 3;
+    _off.applyQuaternion(e.q).add(e.pos);
+    _qm.copy(e.q); if (swarm) { _qt.setFromAxisAngle(_UP, Math.sin(t * 0.9 + s.ph) * 0.4 + (swarm ? ang : 0)); _qm.multiply(_qt); }
+    _ms.setScalar(g.mlen);
+    _M.compose(_off, _qm, _ms); g.inst.setMatrixAt(s.k, _M);
+    if (g.glow) {
+      const eng = g.model.engines;
+      for (let q = 0; q < eng.length; q++) {
+        _ge.copy(eng[q].p).applyQuaternion(_qm).multiplyScalar(g.mlen).add(_off);
+        _gs.setScalar(eng[q].s * g.mlen * 0.9);
+        _M.compose(_ge, _qm, _gs); g.glow.setMatrixAt(s.k * eng.length + q, _M);
+      }
+    }
+  }
+  for (const g of e.groups) { g.inst.instanceMatrix.needsUpdate = true; if (g.glow) g.glow.instanceMatrix.needsUpdate = true; }
+}
+function setShipVisible(e, v) {
+  e.visible = v; e.group.visible = v; e.trail.line.visible = v;
+  for (const g of e.groups) { g.inst.visible = v; if (g.glow) g.glow.visible = v; }
+}
+
+/* ---- Marcadores: punto brillante por nave, más grande cuanto más lejos está la cámara,
+        y que se desvanece al acercarse (cuando la nave ya se ve por sí misma) ---- */
+const markerU = { uFocal: { value: 600 }, uPx: { value: 1 } };
+const markers = (() => {
+  const n = ships.length, pos = new Float32Array(n * 3), colA = new Float32Array(n * 3), size = new Float32Array(n), vis = new Float32Array(n);
+  ships.forEach((e, i) => { const c = new THREE.Color(e.def.color); colA.set([c.r, c.g, c.b], i * 3); size[i] = Math.max(e.len, e.extent * 1.2); vis[i] = 1; });
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.BufferAttribute(pos, 3).setUsage(THREE.DynamicDrawUsage));
+  g.setAttribute('aColor', new THREE.BufferAttribute(colA, 3));
+  g.setAttribute('aSize', new THREE.BufferAttribute(size, 1));
+  g.setAttribute('aVis', new THREE.BufferAttribute(vis, 1).setUsage(THREE.DynamicDrawUsage));
+  const m = new THREE.ShaderMaterial({
+    uniforms: markerU, transparent: true, depthTest: false, depthWrite: false, blending: THREE.AdditiveBlending,
+    vertexShader: `
+      attribute vec3 aColor; attribute float aSize, aVis; uniform float uFocal, uPx; varying vec3 vC; varying float vA;
+      void main() {
+        vec4 mv = modelViewMatrix * vec4(position, 1.0); float dist = max(-mv.z, 0.01);
+        float screenLen = aSize * uFocal / dist;                        // tamaño aparente de la nave en px
+        vA = aVis * (1.0 - smoothstep(10.0, 40.0, screenLen));
+        gl_PointSize = uPx * (8.0 + 6.0 * smoothstep(40.0, 400.0, dist));   // crece al alejar la cámara
+        vC = aColor; gl_Position = projectionMatrix * mv;
+      }`,
+    fragmentShader: `
+      varying vec3 vC; varying float vA;
+      void main() {
+        float d = length(gl_PointCoord - 0.5) * 2.0;
+        float a = (smoothstep(1.0, 0.55, d) * 0.55 + smoothstep(0.35, 0.0, d) * 0.45) * vA;
+        gl_FragColor = vec4(mix(vC, vec3(1.0), 0.25) * a, a);
+      }`,
+  });
+  const pts = new THREE.Points(g, m); pts.frustumCulled = false; pts.renderOrder = 10; shipLayer.add(pts);
+  return { pts, pos, vis, g };
+})();
+function updateMarkers() {
+  ships.forEach((e, i) => { markers.pos[i * 3] = e.pos.x; markers.pos[i * 3 + 1] = e.pos.y; markers.pos[i * 3 + 2] = e.pos.z; markers.vis[i] = e.visible ? 1 : 0; });
+  markers.g.attributes.position.needsUpdate = true; markers.g.attributes.aVis.needsUpdate = true;
+}
+
+/* ---- Anillo pulsante («Ver») ---- */
+const ringSprite = (() => {
+  const s = 128, cv = document.createElement('canvas'); cv.width = cv.height = s;
+  const ctx = cv.getContext('2d'); ctx.strokeStyle = 'rgba(255,230,160,0.95)'; ctx.lineWidth = 6; ctx.beginPath(); ctx.arc(s / 2, s / 2, s / 2 - 8, 0, TAU); ctx.stroke();
+  const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: new THREE.CanvasTexture(cv), transparent: true, depthTest: false, depthWrite: false }));
+  sp.visible = false; sp.renderOrder = 11; shipLayer.add(sp); return sp;
+})();
+let highlight = { ent: null, until: 0 };
+function updateHighlight(now) {
+  const h = highlight;
+  if (!h.ent || now > h.until) { ringSprite.visible = false; return; }
+  const dist = camera.position.distanceTo(_ge.copy(h.ent.pos).add(root.position));
+  const base = Math.max(h.ent.hitR * 2.2, dist * 0.05);
+  const p = (now % 700) / 700, s = base * (1 + 0.5 * p);
+  ringSprite.visible = h.ent.visible; ringSprite.position.copy(h.ent.pos); ringSprite.scale.set(s, s, 1); ringSprite.material.opacity = 1 - p;
+}
+
+initShips();
+
+/* =====================================================================
+   CÁMARA: arrastrar = rotar, rueda = zoom (controles propios, sin libs)
+   ===================================================================== */
+const cam = { theta: 0.5, phi: THREE.MathUtils.degToRad(90 - 57), dist: 250 };  // 57° sobre el plano orbital
+const camT = { ...cam };
+const pointers = new Map(), downPos = new Map();
+let selected = null; // planeta seleccionado (def de BODIES)
+// Seguimiento: el objetivo de la cámara es ancla (Sol o nave) + un desfase que decae, así el seguimiento es exacto sin retraso
+const camOff = new THREE.Vector3(), camTarget = new THREE.Vector3();
+let following = null, flyUntil = 0, minDist = 14, homeDist = 250;
+function anchorPos(ent, out) { return ent ? out.copy(ent.pos).add(root.position) : out.set(0, root.position.y, 0); }
+function setFollow(ent) {
+  if (ent === following) { if (ent) { camT.dist = ent.followDist; flyUntil = performance.now() + 1800; } return; }
+  camOff.add(anchorPos(following, new THREE.Vector3())).sub(anchorPos(ent, new THREE.Vector3()));
+  following = ent; flyUntil = performance.now() + 1800;
+  minDist = ent ? ent.followMin : 14;
+  camT.dist = ent ? ent.followDist : homeDist;
+}
+let pinchPrev = 0;
+canvas.addEventListener('pointerdown', e => { canvas.setPointerCapture(e.pointerId); pointers.set(e.pointerId, { x: e.clientX, y: e.clientY }); downPos.set(e.pointerId, { x: e.clientX, y: e.clientY }); pinchPrev = 0; });
+const endPtr = e => { pointers.delete(e.pointerId); pinchPrev = 0; };
+canvas.addEventListener('pointerup', e => {
+  const d = downPos.get(e.pointerId); downPos.delete(e.pointerId);
+  // clic (sin arrastre): selecciona el planeta bajo el cursor; clic en el vacío o en el mismo planeta lo deselecciona
+  if (d && pointers.size === 1 && Math.hypot(e.clientX - d.x, e.clientY - d.y) < 5) {
+    mouse.x = e.clientX; mouse.y = e.clientY;
+    const hit = pick();
+    if (hit && hit.ship) setFollow(hit.ship);
+    else {
+      const pl = hit && hit.planet ? hit.planet : null;
+      selected = pl && pl !== selected ? pl : null;
+      if (!hit) setFollow(null);        // clic en el fondo: suelta el seguimiento
+    }
+  }
+  endPtr(e);
+});
+canvas.addEventListener('pointercancel', endPtr);
+canvas.addEventListener('pointermove', e => {
+  mouse.x = e.clientX; mouse.y = e.clientY; mouse.inside = true;
+  const p = pointers.get(e.pointerId); if (!p) return;
+  if (pointers.size === 1) {
+    camT.theta -= (e.clientX - p.x) * 0.006;
+    camT.phi = Math.max(0.03, Math.min(Math.PI - 0.03, camT.phi - (e.clientY - p.y) * 0.006));
+  }
+  p.x = e.clientX; p.y = e.clientY;
+  if (pointers.size === 2) {
+    const [a, b] = [...pointers.values()], d = Math.hypot(a.x - b.x, a.y - b.y);
+    if (pinchPrev) camT.dist = clampDist(camT.dist * pinchPrev / d);
+    pinchPrev = d;
+  }
+});
+canvas.addEventListener('pointerleave', () => { mouse.inside = false; });
+canvas.addEventListener('wheel', e => { e.preventDefault(); camT.dist = clampDist(camT.dist * Math.exp(e.deltaY * 0.0012)); }, { passive: false });
+function clampDist(d) { return Math.max(minDist, Math.min(700, d)); }
+
+/* =====================================================================
+   TOOLTIP: proyección a pantalla + radio de detección generoso
+   (equivale a un raycast con tolerancia constante en píxeles)
+   ===================================================================== */
+const mouse = { x: 0, y: 0, inside: false };
+const tip = document.getElementById('tip');
+const _v = new THREE.Vector3();
+let viewW = 1, viewH = 1;
+function screenInfo(t) {
+  t.obj.getWorldPosition(_v);
+  const dist = camera.position.distanceTo(_v);
+  const scale = (viewH / 2) / (Math.tan(THREE.MathUtils.degToRad(camera.fov / 2)) * dist); // px por unidad
+  _v.project(camera);
+  return { x: (_v.x * 0.5 + 0.5) * viewW, y: (-_v.y * 0.5 + 0.5) * viewH, r: t.radius * scale, behind: _v.z > 1 };
+}
+const HIT_PAD = 12; // px extra alrededor de cada cuerpo
+function pick() {
+  let best = null, bestScore = Infinity;
+  for (const t of hitTargets) {
+    if (t.ship && !t.ship.visible) continue;
+    const s = screenInfo(t); if (s.behind) continue;
+    const rr = t.ship ? Math.max(s.r, 5) : s.r;       // las naves son diminutas: radio mínimo en píxeles
+    const d = Math.hypot(s.x - mouse.x, s.y - mouse.y);
+    if (d > rr + HIT_PAD) continue;
+    const score = d - (t.ship ? Math.min(rr, 6) + 2 : rr);   // las flotas detectan en un radio amplio, pero puntúan por su centro   // prefiere el cuerpo bajo el cursor (y las naves sobre su planeta)
+    if (score < bestScore) { bestScore = score; best = t; }
+  }
+  return best;
+}
+function updateHover() {
+  const hit = mouse.inside ? pick() : null;
+  if (hit) {
+    tip.textContent = hit.name; tip.style.display = 'block';
+    tip.style.transform = `translate(${mouse.x + 14}px, ${mouse.y + 16}px)`;
+    canvas.style.cursor = 'pointer';
+  } else { tip.style.display = 'none'; canvas.style.cursor = 'default'; }
+}
+
+/* =====================================================================
+   HUD
+   ===================================================================== */
+let paused = false, speed = 1;
+const $ = id => document.getElementById(id);
+const playBtn = $('play'), speedEl = $('speed');
+function setPaused(p) { paused = p; playBtn.textContent = p ? '▶ Reanudar' : '⏸ Pausa'; }
+playBtn.addEventListener('click', () => setPaused(!paused));
+addEventListener('keydown', e => { if (e.code === 'Space' && e.target === document.body) { e.preventDefault(); setPaused(!paused); } });
+speedEl.addEventListener('input', () => {
+  speed = Math.pow(2, +speedEl.value);
+  $('spdlbl').textContent = 'x' + (Math.abs(speed - Math.round(speed)) < 0.01 ? Math.round(speed) : speed.toFixed(2));
+});
+
+const lightEl = $('light'), trailChk = $('trailchk');
+lightEl.addEventListener('input', () => {
+  const p = +lightEl.value / 100;                 // 0 … 2, por defecto 1
+  sunLight.intensity = SUN_LIGHT * p;
+  ambient.intensity = AMBIENT_LIGHT * p * p;      // el lado nocturno responde más al subir la luz
+  $('lightlbl').textContent = Math.round(p * 100) + '%';
+});
+trailChk.addEventListener('change', () => { for (const t of trails) t.line.visible = trailChk.checked; });
+
+/* =====================================================================
+   NAVES — 4. MENÚ DE LOCALIZACIÓN (panel plegable, sin recrear el DOM en cada frame)
+   ===================================================================== */
+const fleetEl = $('fleet'), listEl = $('shipList'), searchEl = $('shipSearch'), masterEl = $('shipsMaster');
+const norm = s => s.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+const sagaOn = {}; SAGAS.forEach(sg => { sagaOn[sg.key] = true; });
+const rowByShip = new Map(), secBySaga = {};
+SAGAS.forEach(sg => {
+  const sec = document.createElement('div'); sec.className = 'saga'; secBySaga[sg.key] = sec;
+  const h = document.createElement('h4'); h.textContent = sg.label; sec.appendChild(h);
+  ships.filter(e => e.def.saga === sg.key).forEach(e => {
+    const row = document.createElement('div'); row.className = 'srow'; row.dataset.id = e.id;
+    row.innerHTML = '<div class="sname"><i class="dot"></i><b></b></div><div class="smeta"></div><div class="sstat"></div>' +
+      '<div class="sbtns"><button class="pbtn" data-act="loc">Localizar</button><button class="pbtn" data-act="see">Ver</button></div>';
+    row.querySelector('.dot').style.background = e.def.color;
+    row.querySelector('b').textContent = e.def.name;
+    row.querySelector('.smeta').textContent = `${e.def.work} (${e.def.year})`;
+    row.hay = norm(`${e.def.name} ${e.def.alias || ''} ${e.def.work} ${sg.label} ${e.def.year}`);
+    row.statEl = row.querySelector('.sstat'); row.lastStat = '';
+    sec.appendChild(row); rowByShip.set(e, row);
+  });
+  listEl.appendChild(sec);
+});
+
+function applyFilters() {
+  const q = norm(searchEl.value.trim());
+  SAGAS.forEach(sg => {
+    let any = false;
+    for (const e of ships) if (e.def.saga === sg.key) { const r = rowByShip.get(e), show = (!q || r.hay.includes(q)) && sagaOn[sg.key]; r.hidden = !show; any = any || show; }
+    secBySaga[sg.key].hidden = !any;
+  });
+}
+function applyVisibility() {
+  for (const e of ships) setShipVisible(e, masterEl.checked && sagaOn[e.def.saga]);
+  if (following && !following.visible) setFollow(null);
+  applyFilters();
+}
+searchEl.addEventListener('input', applyFilters);
+masterEl.addEventListener('change', applyVisibility);
+document.querySelectorAll('#sagaChecks input').forEach(cb => cb.addEventListener('change', () => { sagaOn[cb.dataset.saga] = cb.checked; applyVisibility(); }));
+$('fleetToggle').addEventListener('click', () => { fleetEl.classList.toggle('open'); $('fleetToggle').setAttribute('aria-expanded', fleetEl.classList.contains('open')); });
+if (innerWidth >= 700) { fleetEl.classList.add('open'); $('fleetToggle').setAttribute('aria-expanded', 'true'); }   // cerrado por defecto en móvil
+listEl.addEventListener('click', ev => {
+  const btn = ev.target.closest('button[data-act]'); if (!btn) return;
+  const e = shipById[btn.closest('.srow').dataset.id];
+  if (btn.dataset.act === 'loc') setFollow(e); else highlight = { ent: e, until: performance.now() + 4000 };
+});
+
+const fmtAU = r => { const au = r <= 10 ? 0 : Math.pow((r - 10) / 16, 2); return '≈ ' + au.toFixed(1).replace('.', ',') + ' UA del Sol'; };
+function nearestPlanet(e, t) {
+  let best = null, bd = Infinity;
+  for (const tg of PLANET_TARGETS) { const d = tg.pos(t, _tp).distanceTo(e.pos); if (d < bd) { bd = d; best = tg; } }
+  return best.name;
+}
+function statusText(e, t) {
+  let s;
+  if (e.state === 'orbit') s = 'Orbitando ' + e.orb.target.name;
+  else if (e.state === 'travel') s = `Viajando de ${e.tr.from.name} a ${e.tr.dest.name} · ${Math.round(clampN((t - e.tr.t0) / e.tr.T, 0, 1) * 100)} %`;
+  else s = 'Estacionada (órbita lenta) cerca de ' + nearestPlanet(e, t);
+  return s + ' · ' + fmtAU(e.pos.length());
+}
+let lastMenu = 0;
+function refreshMenu(now, t) {                       // como mucho ~4 veces por segundo
+  if (now - lastMenu < 230) return; lastMenu = now;
+  if (!fleetEl.classList.contains('open')) return;
+  for (const e of ships) { const r = rowByShip.get(e); if (r.hidden) continue; const s = statusText(e, t); if (s !== r.lastStat) { r.lastStat = s; r.statEl.textContent = s; } }
+}
+
+addEventListener('keydown', e => { if (e.key === 'Escape') setFollow(null); });
+
+/* =====================================================================
+   BUCLE: tiempo por reloj real (performance.now), no por frames
+   ===================================================================== */
+let simSeconds = 0;               // segundos simulados a x1; 1 año terrestre = 60 s
+let last = performance.now();
+
+function frame(now) {
+  requestAnimationFrame(frame);
+  const dt = Math.min((now - last) / 1000, 1); last = now;   // tope 1 s si la pestaña estuvo oculta
+  if (!paused) simSeconds += dt * speed;
+  const years = simSeconds / EARTH_YEAR_SECONDS;
+
+  root.position.y = DRIFT * simSeconds;           // el sistema avanza
+  starsObj.position.y = root.position.y * 0.985;    // fondo casi fijo, con un mínimo de paralaje
+  sunMesh.rotation.y = simSeconds * TAU / (SUN.rotHours * ROT_SECONDS_PER_HOUR);
+  for (const p of planets) {
+    const d = p.def, ang = p.phase + TAU * years / d.period;
+    p.pivot.position.set(Math.cos(ang) * d.orbitR, 0, -Math.sin(ang) * d.orbitR);
+    p.mesh.rotation.y = simSeconds * TAU / d.rot;
+    for (const m of p.moons) {
+      const a = m.phase + TAU * simSeconds / m.def.period;
+      m.mesh.position.set(Math.cos(a) * m.def.orbit, 0, -Math.sin(a) * m.def.orbit);
+      m.mesh.rotation.y = a; // rotación síncrona
+    }
+  }
+
+  updateShips(simSeconds, dt, now);
+
+  // cámara suavizada; acompaña al Sol o a la nave seguida (más lenta durante el vuelo de «Localizar»)
+  const rate = now < flyUntil ? 3.2 : 12, k = 1 - Math.exp(-dt * rate);
+  cam.theta += (camT.theta - cam.theta) * k; cam.phi += (camT.phi - cam.phi) * k; cam.dist += (camT.dist - cam.dist) * k;
+  camOff.multiplyScalar(1 - k);
+  camTarget.copy(anchorPos(following, _tp)).add(camOff);
+  camera.position.set(
+    camTarget.x + cam.dist * Math.sin(cam.phi) * Math.sin(cam.theta),
+    camTarget.y + cam.dist * Math.cos(cam.phi),
+    camTarget.z + cam.dist * Math.sin(cam.phi) * Math.cos(cam.theta));
+  camera.lookAt(camTarget);
+  camera.near = clampN(cam.dist * 0.04, 0.004, 0.5);   // plano cercano adaptado al zoom: permite ver las naves de cerca
+  camera.updateProjectionMatrix();
+  camera.updateMatrixWorld();
+
+  updateTrails(simSeconds);
+  updateShipTrails(simSeconds); updateMarkers(); updateHighlight(now); refreshMenu(now, simSeconds);
+  starUniforms.uTime.value = now / 1000;
+  updateHover();
+
+  const yr = Math.floor(years), frac = years - yr;
+  $('year').textContent = yr + 1;
+  $('lap').textContent = Math.floor(frac * 100) + '%';
+  $('barfill').style.width = (frac * 100).toFixed(1) + '%';
+
+  const sel = $('sel');
+  if (selected) {
+    const f = years / selected.period; // vueltas completadas (mismo criterio que la Tierra)
+    const fr = f - Math.floor(f);
+    sel.style.display = 'block';
+    $('selname').textContent = selected.name + ' · vuelta ' + (Math.floor(f) + 1);
+    $('sellap').textContent = (Math.floor(fr * 1000) / 10).toFixed(1) + '%'; // 1 decimal: Saturno avanza ~0,1 % por segundo
+    $('selfill').style.width = (fr * 100).toFixed(1) + '%';
+  } else sel.style.display = 'none';
+
+  renderer.render(scene, camera);
+}
+
+/* ---- Redimensionado (DPR máx. 2) ---- */
+function resize() {
+  viewW = innerWidth; viewH = innerHeight;
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  renderer.setPixelRatio(dpr);
+  renderer.setSize(viewW, viewH, false);
+  camera.aspect = viewW / viewH; camera.updateProjectionMatrix();
+  starUniforms.uPx.value = dpr;
+  markerU.uPx.value = dpr; markerU.uFocal.value = (viewH / 2) / Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+}
+addEventListener('resize', resize);
+resize();
+{ // distancia inicial para encajar Plutón en pantalla
+  const rMax = BODIES[BODIES.length - 1].orbitR * 1.12, t = Math.tan(THREE.MathUtils.degToRad(camera.fov / 2));
+  cam.dist = camT.dist = homeDist = clampDist(Math.max(rMax * 0.85 / t, rMax / (t * camera.aspect)));
+}
+
+// API mínima para pruebas automáticas
+window.__solar = {
+  earthAngle: () => { const e = planets.find(p => p.def.name === 'Tierra'); return e.phase + TAU * (simSeconds / EARTH_YEAR_SECONDS); },
+  screenPos: name => { const t = hitTargets.find(h => h.name === name); const s = screenInfo(t); return { x: s.x, y: s.y, r: s.r }; },
+  ships: shipById, setFollow: id => setFollow(id ? shipById[id] : null),
+  shipScreen: id => { const e = shipById[id], s = screenInfo({ obj: e.group, radius: e.hitR }); return { x: s.x, y: s.y, r: s.r }; },
+  shipInfo: id => { const e = shipById[id]; return { state: e.state, target: e.state === 'orbit' ? e.orb.target.name : e.state === 'travel' ? e.tr.dest.name : null, pos: e.pos.toArray(), visible: e.visible }; },
+  camInfo: () => ({ dist: cam.dist, follow: following && following.id, toShip: following ? camera.position.distanceTo(anchorPos(following, new THREE.Vector3())) : null }),
+  sunMin: () => sunMin, renderInfo: () => ({ calls: renderer.info.render.calls, tris: renderer.info.render.triangles }),
+  setPaused, select: n => { selected = BODIES.find(b => b.name === n) || null; }, hitTargets: () => hitTargets.map(h => h.name),
+};
+requestAnimationFrame(t => { last = t; frame(t); });
+</script>
+</body>
+</html>
