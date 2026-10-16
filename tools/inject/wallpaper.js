@@ -61,7 +61,7 @@
     const el = document.getElementById('speed'); if (!el) return false;
     el.value = String(Math.log2(clamp(CFG.speed, 0.25, 4))); el.dispatchEvent(new Event('input', { bubbles: true })); return true;
   }
-  document.addEventListener('DOMContentLoaded', () => { if (CFG.speed !== 1) applySpeed(); if (CFG.orbits === false) window.livelyPropertyListener('orbits', false); });
+  document.addEventListener('DOMContentLoaded', () => { if (CFG.speed !== 1) applySpeed(); if (CFG.orbits === false) window.livelyPropertyListener('orbits', false); if (CFG.language) window.livelyPropertyListener('language', CFG.language); });
 
   /* ---------- 5. Lively ---------- */
   const QUALITY = [0.75, 1, 1.5, 2];                // Baja, Media, Alta, Máxima → tope de devicePixelRatio
@@ -72,6 +72,7 @@
       case 'autopilot': CFG.autopilot = !!val; break;
       case 'followShips': CFG.followShips = !!val; break;
       case 'orbits': { const el = document.getElementById('orbitchk'); CFG.orbits = !!val; if (el) { el.checked = !!val; el.dispatchEvent(new Event('change', { bubbles: true })); } break; }
+      case 'language': CFG.language = (val === 1 || val === 'en') ? 'en' : 'es'; if (window.__solar && window.__solar.setLang) window.__solar.setLang(CFG.language); break;
       case 'showUI': CFG.showUI = !!val; applyUI(); break;
       case 'speed': CFG.speed = clamp(+val || 1, 0.25, 4); applySpeed(); break;
     }

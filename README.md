@@ -10,6 +10,11 @@ Simulación 3D animada del sistema solar en **un único `index.html`** (sin buil
 Las siluetas están hechas con primitivas 3D y son aproximaciones; los nombres de obras y naves se usan solo como etiquetas.
 Proyecto de aficionado, sin relación con los titulares de esas obras ni de sus marcas.
 
+## Idioma y contacto
+- **Idioma:** selector *Español / English* en el panel (se recuerda en el navegador; también `?lang=en`). Traduce la interfaz, los nombres de cuerpos y de naves, y la búsqueda funciona en ambos idiomas.
+- **Contactar al equipo:** botón verde «Contacta al equipo creador» (abajo a la derecha) que abre un formulario con **Nombre, Mail y Mensaje obligatorios**. El mensaje se envía por [FormSubmit](https://formsubmit.co) al correo configurado en la constante `CONTACT_EMAIL` de `index.html`.
+  **La primera vez** FormSubmit manda un correo de activación a esa dirección: hay que pulsar el enlace una vez para que lleguen los mensajes. Para no dejar el correo a la vista en el código, tras activarlo se puede sustituir por el alias aleatorio que da FormSubmit (`CONTACT_ENDPOINT`).
+
 ## Ver en local
 Abre `index.html` en el navegador (necesita internet solo para cargar Three.js desde la CDN).
 

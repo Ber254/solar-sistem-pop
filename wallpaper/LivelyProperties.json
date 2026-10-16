@@ -41,6 +41,15 @@
     "text": "Mostrar órbitas",
     "value": true
   },
+  "language": {
+    "type": "dropdown",
+    "text": "Idioma / Language",
+    "value": 0,
+    "items": [
+      "Español",
+      "English"
+    ]
+  },
   "showUI": {
     "type": "checkbox",
     "text": "Mostrar interfaz (HUD y menú de naves)",
