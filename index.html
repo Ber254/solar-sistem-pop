@@ -1532,5 +1532,14 @@ window.__solar = {
 };
 requestAnimationFrame(t => { last = t; frame(t); });
 </script>
+<script>
+/* Analítica de visitas: Vercel Web Analytics (sin cookies, no guarda datos personales). Solo se carga al servir
+   la página por https (en Vercel); en local o en el fondo de Lively (file://) no hace nada. Se activa en
+   Vercel → proyecto → pestaña Analytics → Enable. */
+if (location.protocol === 'https:') {
+  window.va = window.va || function () { (window.vaq = window.vaq || []).push(arguments); };
+  const sc = document.createElement('script'); sc.defer = true; sc.src = '/_vercel/insights/script.js'; document.head.appendChild(sc);
+}
+</script>
 </body>
 </html>
